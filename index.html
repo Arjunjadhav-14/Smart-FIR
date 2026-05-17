@@ -1,0 +1,3202 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart FIR Portal — Official Citizen Legal & Emergency Companion</title>
+
+  <!-- SEO Optimization -->
+  <meta name="description"
+    content="Smart FIR is a trusted citizen legal guidance and emergency portal. Classify incidents, file legal draft FIRs under BNS/IPC codes, secure evidence lockers, and locate nearby police stations instantly." />
+  <meta name="keywords"
+    content="Smart FIR, AI Police Assistant, Indian Law Companion, BNS 2023, Zero FIR rights, emergency SOS Mumbai, online police draft generator" />
+
+  <!-- Premium Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&family=Montserrat:wght@400;700;800;900&display=swap"
+    rel="stylesheet">
+
+  <!-- Tailwind Play CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            montserrat: ['Montserrat', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18 & Babel CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- jsPDF UMD CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <!-- Firebase Compat SDK CDNs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+
+  <style>
+    body {
+      background-color: #F9FAFB;
+      color: #1F2937;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Custom official seal background dot grid */
+    .gov-seal-bg {
+      background-image: radial-gradient(rgba(26, 58, 107, 0.02) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #F3F4F6;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94A3B8;
+    }
+
+    @keyframes float {
+
+      0%,
+      100% {
+        transform: translateY(0px);
+      }
+
+      50% {
+        transform: translateY(-5px);
+      }
+    }
+
+    .animate-float {
+      animation: float 4s ease-in-out infinite;
+    }
+
+    @keyframes pulse-red {
+
+      0%,
+      100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4);
+      }
+
+      50% {
+        transform: scale(1.02);
+        box-shadow: 0 0 0 10px rgba(220, 38, 38, 0);
+      }
+    }
+
+    .animate-pulse-red {
+      animation: pulse-red 2s infinite;
+    }
+
+    @keyframes siren {
+
+      0%,
+      100% {
+        background-color: #FEE2E2;
+      }
+
+      50% {
+        background-color: #FCA5A5;
+      }
+    }
+
+    .animate-siren {
+      animation: siren 2s ease-in-out infinite;
+    }
+  </style>
+</head>
+
+<body class="gov-seal-bg">
+  <div id="root"></div>
+
+  <!-- REACT ROOT APP USING BABEL -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // ----------------------------------------------------
+    // INTEGRATED VECTOR ICONS (Lucide Inline Replacements)
+    // ----------------------------------------------------
+    const Icon = ({ name, className = "w-5 h-5", ...props }) => {
+      const icons = {
+        shield: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        ),
+        alertTriangle: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        ),
+        messageSquare: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+        ),
+        scale: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7h12m0 0l-3 1m3-1l3 9a5.002 5.002 0 00-6.001 0M18 7l-3 9m3-9V4m0-2h-3m3 0V4" />
+          </svg>
+        ),
+        mapPin: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        ),
+        eye: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+        ),
+        fileText: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        ),
+        download: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+        ),
+        share: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 10.742l4.632-2.316m0 0a3 3 0 10-4.632-2.316 3 3 0 004.632 2.316zm0 0a3 3 0 104.632 2.316 3 3 0 00-4.632-2.316zm-4.632 2.316l4.632 2.316m0 0a3 3 0 11-4.632-2.316 3 3 0 014.632 2.316z" />
+          </svg>
+        ),
+        printer: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
+        ),
+        phone: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+          </svg>
+        ),
+        arrowRight: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          </svg>
+        ),
+        arrowLeft: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+        ),
+        volume2: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M12 18.75V5.25L7.75 9.5H4.5v5h3.25L12 18.75z" />
+          </svg>
+        ),
+        mic: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+          </svg>
+        ),
+        settings: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        ),
+        upload: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+        ),
+        checkCircle: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+        chevronRight: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        ),
+        x: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ),
+        user: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        ),
+        lock: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        ),
+        heart: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+        ),
+        refresh: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.27 15.75H18" />
+          </svg>
+        ),
+        layers: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+        ),
+        info: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+        check: (
+          <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        )
+      };
+      return icons[name] || icons.shield;
+    };
+
+    // ----------------------------------------------------
+    // BILINGUAL TRANSLATION & DICTIONARY
+    // ----------------------------------------------------
+    const LOCALIZATION = {
+      en: {
+        appName: "Smart FIR Portal",
+        tagline: "Government-Guided Citizen Legal & Emergency Assistant",
+        securityStatus: "Clearance: ACTIVE & COMPLIANT (BNS/CrPC)",
+        activeLocation: "Sakinaka Precinct, Zone 10, Mumbai, MH",
+        startAssistant: "Start AI Legal Guidance",
+        sosTrigger: "EMERGENCY SOS PANIC BUTTON",
+        lockerTitle: "Secure Evidence Locker",
+        locatorTitle: "Police Precinct Maps Locator",
+        rightsHandbook: "Citizen Rights Handbook",
+        sirenToggle: "Trigger Emergency Alarm",
+        sirenPlaying: "Siren Sounding...",
+        enterMessage: "Describe the incident in simple words...",
+        send: "Submit Statement",
+        warningTitle: "CITIZEN PROTECTION WARNING",
+        warningAadhaar: "For safety, do not share Aadhaar, passwords, or bank credentials. Your data is protected by encryption.",
+        emergencyHeader: "!!! EMERGENCY SOS ACTIVE !!!",
+        emergencySub: "Your safety is our top priority. Please read instructions below.",
+        reachSafety: "STEP 1: Move to a crowded or secure location immediately.",
+        dispatching: "Emergency dispatch active. Nearby patrol notified of your coordinates...",
+        coordinates: "Your Coordinates:",
+        sirenSimulation: "Loud alarm sounds locally to alert nearby citizens.",
+        call100: "Call Police Control (100)",
+        call112: "Call Emergency Services (112)",
+        call1091: "Call Women Helpline (1091)",
+        cancelEmergency: "Deactivate SOS Alert",
+        classificationTitle: "AI Incident Categorization",
+        confirmCategory: "Please review and confirm the incident categorization to proceed:",
+        severityLevel: "Assessed Incident Severity:",
+        confirmProceed: "Confirm & Start Guided Questionnaire",
+        changeCategory: "Manually Re-Classify Category",
+        legalRightsTitle: "Citizen Legal Rights Explanation",
+        rightsSub: "Under Bharatiya Nyaya Sanhita (BNS), 2023 & IPC, you are protected by structural rights:",
+        proceedToDraft: "Generate Formal FIR Draft",
+        firDraftTitle: "FORM I - FIRST INFORMATION REPORT COMPLAINT DRAFT",
+        firDraftSub: "(Recorded Under Section 154 of Cr.P.C / Section 173 of BNS, 2023)",
+        firDisclaimer: "Disclaimer: This app provides FIR filing guidance only and does not replace official police FIR submission.",
+        downloadPdf: "Download PDF Draft",
+        printFir: "Print FIR Summary",
+        shareDraft: "Share Summary",
+        pdfReady: "FIR Complaint Draft PDF Generated",
+        lockerSub: "Upload screenshots, receipts, or photos. Files are encrypted and indexed to your complaint.",
+        addEvidence: "Secure New File",
+        lockerTimeline: "Secured Evidence Envelope List",
+        locatorSub: "Showing nearest stations within 5km zone. Click maps to open GPS directions.",
+        cyberCell: "Cyber Crime Cell",
+        womenCell: "Women Police Precinct",
+        getDirections: "Get Directions",
+        voiceInputActive: "Listening... speak now.",
+        voiceInputClick: "Simulate Voice Command",
+        backToDashboard: "Return to Main Dashboard",
+        splashLoading: "Securing connection and loading Legal Codification Databases...",
+        quickLaunch: "Launch Portal"
+      },
+      hi: {
+        appName: "स्मार्ट FIR पोर्टल",
+        tagline: "सरकारी नागरिक कानूनी और आपातकालीन डिजिटल सहायक",
+        securityStatus: "सुरक्षा स्थिति: सक्रिय और सुरक्षित (BNS/CrPC)",
+        activeLocation: "साकीनाका क्षेत्र, जोन 10, मुंबई, महाराष्ट्र",
+        startAssistant: "एआई कानूनी मार्गदर्शन शुरू करें",
+        sosTrigger: "आपातकालीन SOS पैनिक बटन",
+        lockerTitle: "सुरक्षित साक्ष्य लॉकर",
+        locatorTitle: "पुलिस स्टेशन खोजक",
+        rightsHandbook: "नागरिक अधिकार पुस्तिका",
+        sirenToggle: "आपातकालीन अलार्म बजाएं",
+        sirenPlaying: "सायरन बज रहा है...",
+        enterMessage: "घटना का सरल शब्दों में वर्णन करें...",
+        send: "जमा करें",
+        warningTitle: "नागरिक सुरक्षा चेतावनी",
+        warningAadhaar: "सुरक्षा के लिए, आधार, पासवर्ड या बैंक विवरण साझा न करें। आपका डेटा एन्क्रिप्टेड है।",
+        emergencyHeader: "!!! आपातकालीन SOS सक्रिय !!!",
+        emergencySub: "आपकी सुरक्षा हमारी सर्वोच्च प्राथमिकता है। कृपया नीचे दिए गए निर्देश पढ़ें।",
+        reachSafety: "चरण 1: तुरंत किसी सुरक्षित या भीड़भाड़ वाले स्थान पर जाएं।",
+        dispatching: "आपातकालीन प्रेषण सक्रिय। नजदीकी पेट्रोलिंग को आपके निर्देशांक भेजे गए...",
+        coordinates: "आपके निर्देशांक:",
+        sirenSimulation: "आसपास के लोगों को सचेत करने के लिए तेज सायरन बज रहा है।",
+        call100: "पुलिस नियंत्रण कक्ष (100)",
+        call112: "आपातकालीन सेवाएं (112)",
+        call1091: "महिला हेल्पलाइन (1091)",
+        cancelEmergency: "आपातकालीन अलर्ट बंद करें",
+        classificationTitle: "घटना वर्गीकरण",
+        confirmCategory: "आगे बढ़ने के लिए कृपया घटना वर्गीकरण की समीक्षा और पुष्टि करें:",
+        severityLevel: "निर्धारित घटना गंभीरता स्तर:",
+        confirmProceed: "पुष्टि करें और प्रश्नोत्तरी शुरू करें",
+        changeCategory: "श्रेणी मैन्युअल रूप से बदलें",
+        legalRightsTitle: "नागरिकों के कानूनी अधिकार",
+        rightsSub: "भारतीय न्याय संहिता (BNS), 2023 के तहत आप निम्नलिखित अधिकारों द्वारा सुरक्षित हैं:",
+        proceedToDraft: "औपचारिक FIR ड्राफ्ट तैयार करें",
+        firDraftTitle: "फॉर्म I - प्रथम सूचना रिपोर्ट शिकायत मसुदा",
+        firDraftSub: "(सीआरपीसी की धारा 154 / बीएनएस, 2023 की धारा 173 के तहत)",
+        firDisclaimer: "अस्वीकरण: यह ऐप केवल FIR दर्ज करने के लिए मार्गदर्शन प्रदान करता है और आधिकारिक पुलिस FIR जमा करने का स्थान नहीं लेता है।",
+        downloadPdf: "पीडीएफ ड्राफ्ट डाउनलोड करें",
+        printFir: "प्रिंट करें",
+        shareDraft: "साझा करें",
+        pdfReady: "FIR शिकायत मसुदा पीडीएफ सफलतापूर्वक बनाया गया",
+        lockerSub: "स्क्रीनशॉट, रसीदें या तस्वीरें अपलोड करें। फाइलें एन्क्रिप्टेड हैं और आपकी शिकायत में जोड़ी गई हैं।",
+        addEvidence: "नया साक्ष्य सुरक्षित करें",
+        lockerTimeline: "सुरक्षित साक्ष्य सूची",
+        locatorSub: "5 किमी के दायरे में निकटतम पुलिस स्टेशन दिखाए जा रहे हैं।",
+        cyberCell: "साइबर क्राइम सेल",
+        womenCell: "महिला पुलिस स्टेशन",
+        getDirections: "दिशा निर्देश प्राप्त करें",
+        voiceInputActive: "सुन रहा है... अब बोलें।",
+        voiceInputClick: "आवाज इनपुट अनुकरण",
+        backToDashboard: "मुख्य डैशबोर्ड पर लौटें",
+        splashLoading: "कनेक्शन सुरक्षित किया जा रहा है और कानूनी डेटाबेस लोड हो रहा है...",
+        quickLaunch: "पोर्टल शुरू करें"
+      },
+      mr: {
+        appName: "स्मार्ट FIR पोर्टल",
+        tagline: "शासकीय नागरिक कायदेशीर आणि आणीबाणी सहाय्यक",
+        securityStatus: "सुरक्षा: सक्रिय आणि सुरक्षित (BNS/CrPC)",
+        activeLocation: "साकीनाका परिसर, झोन १०, मुंबई, महाराष्ट्र",
+        startAssistant: "एआय कायदेशीर मार्गदर्शन सुरू करा",
+        sosTrigger: "आणीबाणी SOS पॅनिक बटण",
+        lockerTitle: "सुरक्षित पुरावा लॉकर",
+        locatorTitle: "पोलीस स्टेशन शोधक",
+        rightsHandbook: "नागरिक अधिकार पुस्तिका",
+        sirenToggle: "आणीबाणी अलार्म वाजवा",
+        sirenPlaying: "सायरन वाजत आहे...",
+        enterMessage: "घटनेचे साध्या शब्दांत वर्णन करा...",
+        send: "पाठवा",
+        warningTitle: "नागरिक सुरक्षा चेतावणी",
+        warningAadhaar: "सुरक्षेसाठी, आधार, पासवर्ड किंवा बँक तपशील शेअर करू नका. तुमचा डेटा सुरक्षित आहे.",
+        emergencyHeader: "!!! आणीबाणी SOS सक्रिय !!!",
+        emergencySub: "तुमची सुरक्षा आमची सर्वोच्च प्राथमिकता आहे. कृपया खालील सूचना वाचा.",
+        reachSafety: "पायरी १: कायदेशीर किंवा गर्दीच्या ठिकाणी जा.",
+        dispatching: "आणीबाणी प्रतिसाद सुरू. जवळच्या गस्ती पथकाला तुमचे स्थान पाठवले आहे...",
+        coordinates: "तुमचे निर्देशांक:",
+        sirenSimulation: "आसपासच्या लोकांना सावध करण्यासाठी सायरन वाजत आहे.",
+        call100: "पोलीस नियंत्रण (100)",
+        call112: "आणीबाणी सेवा (112)",
+        call1091: "महिला हेल्पलाइन (1091)",
+        cancelEmergency: "आणीबाणी मोड बंद करा",
+        classificationTitle: "घटना वर्गीकरण",
+        confirmCategory: "आगे जाण्यासाठी कृपया घटना वर्गीकरणाचे पुनरावलोकन आणि पुष्टी करा:",
+        severityLevel: "घटना गांभीर्य पातळी:",
+        confirmProceed: "पुष्टी करा आणि प्रश्न सुरू करा",
+        changeCategory: "श्रेणी मॅन्युअली बदला",
+        legalRightsTitle: "नागरिकांचे कायदेशीर अधिकार",
+        rightsSub: "भारतीय न्याय संहिता (BNS), २०२३ नुसार आपण खालील अधिकारांद्वारे संरक्षित आहात:",
+        proceedToDraft: "औपचारिक FIR मसुदा तयार करा",
+        firDraftTitle: "फॉर्म I - प्रथम माहिती अहवाल तक्रार मसुदा",
+        firDraftSub: "(कलम १५४ क्रपीसी / कलम १७३ बीएनएस, २०२३ अंतर्गत)",
+        firDisclaimer: "अस्वीकरण: हे ॲप फक्त FIR दाखल करण्यासाठी मार्गदर्शन प्रदान करते आणि अधिकृत पोलीस FIR सबमिशनची जागा घेत नाही.",
+        downloadPdf: "पीडीएफ मसुदा डाउनलोड करा",
+        printFir: "प्रिंट करा",
+        shareDraft: "मसुदा शेअर करा",
+        pdfReady: "FIR तक्रार मसुदा पीडीएफ यशस्वीरित्या तयार केला",
+        lockerSub: "स्क्रीनशॉट, पावती किंवा फोटो अपलोड करा. फायली सुरक्षितपणे तक्रारीत जोडल्या आहेत.",
+        addEvidence: "नवीन पुरावा जतन करा",
+        lockerTimeline: "पुरावा संच यादी",
+        locatorSub: "५ किमी परिसरातील पोलीस स्टेशन दाखवत आहे.",
+        cyberCell: "सायबर क्राईम सेल",
+        womenCell: "महिला पोलीस ठाणे",
+        getDirections: "दिशा मिळवा",
+        voiceInputActive: "ऐकत आहे... आता बोला.",
+        voiceInputClick: "आवाज इनपुट सिम्युलेशन",
+        backToDashboard: "मुख्य डॅशबोर्डवर परत जा",
+        splashLoading: "कायदेशीर डेटाबेस लोड केला जात आहे...",
+        quickLaunch: "पोर्टल सुरू करा"
+      }
+    };
+
+    // Mock Data Precincts
+    const POLICE_STATIONS = [
+      { id: 1, name: "Sakinaka Police Station", distance: "0.8 km", contact: "+91-22-28522222", address: "Sakinaka Junction, Andheri East, Mumbai - 400072", lat: 19.0968, lng: 72.8884, type: "General" },
+      { id: 2, name: "Mumbai Cyber Crime Cell (Bandra)", distance: "3.2 km", contact: "+91-22-26590200", address: "Bandra Kurla Complex, Andheri East, Mumbai - 400051", lat: 19.0607, lng: 72.8362, type: "Cyber Cell" },
+      { id: 3, name: "Ghatkopar West Women Helpline Cell", distance: "2.5 km", contact: "+91-22-25113333", address: "LBS Marg, Ghatkopar West, Mumbai - 400086", lat: 19.0863, lng: 72.9090, type: "Women Station" },
+      { id: 4, name: "Andheri East Divisional HQ", distance: "4.1 km", contact: "+91-22-26831111", address: "MV Road, Andheri East, Mumbai - 400069", lat: 19.1136, lng: 72.8697, type: "General" }
+    ];
+
+    // Questionnaire Template
+    const CATEGORY_QUESTIONS = {
+      "Theft / Robbery": [
+        { key: "stolenItem", q: "What specific items were stolen?", type: "text", placeholder: "e.g., Black leather wallet with Cash Rs 10000, credit cards, gold ring" },
+        { key: "itemValue", q: "What is the approximate total value of the stolen item(s)?", type: "text", placeholder: "e.g., Rs. 25,000" },
+        { key: "hasCctv", q: "Are there visible CCTV cameras at the theft location?", type: "select", options: ["Yes, camera is visible", "No cameras visible", "Not sure"] },
+        { key: "suspectDesc", q: "Can you describe the physical features of the suspect(s)?", type: "text", placeholder: "e.g., Man around 30 years old, 5'9\", wearing dark jacket" }
+      ],
+      "Cybercrime / Fraud": [
+        { key: "transactionId", q: "What is the Transaction ID, UPI Reference Number, or account number involved?", type: "text", placeholder: "e.g., UPI Ref 412894038290, Bank Acc 1009849202" },
+        { key: "platformName", q: "Which website, banking app, or platform did the fraud occur on?", type: "text", placeholder: "e.g., SBI net banking, Telegram fake job group, WhatsApp scam call" },
+        { key: "hasScreenshots", q: "Have you saved screenshots of the payments, fake profiles, or chats?", type: "select", options: ["Yes, screenshots saved", "No, deleted them", "Can retrieve them later"] }
+      ],
+      "Assault / Violence": [
+        { key: "injuriesSustained", q: "Describe the physical injuries sustained, if any.", type: "text", placeholder: "e.g., Cut on right forehead, bruise on shoulder" },
+        { key: "hasMedicalReport", q: "Have you undergone a medical exam or obtained a Doctor's report?", type: "select", options: ["Yes, medical exam done", "No, will visit hospital shortly", "No injuries sustained"] },
+        { key: "weaponUsed", q: "Was any weapon or object used to threaten or harm you?", type: "text", placeholder: "e.g., Wooden stick, iron pipe, no weapon used" }
+      ],
+      "Harassment / Stalking": [
+        { key: "stalkerDetails", q: "Describe the stalker or details about the harassment.", type: "text", placeholder: "e.g., Group of three teenagers near Metro gate, anonymous caller calling late night" },
+        { key: "frequency", q: "How frequently has this harassment occurred?", type: "text", placeholder: "e.g., Multiple calls daily for the last 3 days, followed twice this week" },
+        { key: "specialSupport", q: "Would you like a female police officer to handle your inquiry?", type: "select", options: ["Yes, definitely", "Either is fine", "Not required"] }
+      ],
+      "Other": [
+        { key: "otherDetails", q: "Please describe additional details important for the formal complaint:", type: "text", placeholder: "Provide timelines, threat descriptions, or property lost" }
+      ]
+    };
+
+    const getLegalSections = (category) => {
+      switch (category) {
+        case "Theft / Robbery":
+          return {
+            ipc: "Section 379 IPC (Theft)",
+            bns: "Section 303 BNS (Theft)",
+            severity: "MEDIUM",
+            desc: "Cognizable offense. Section 303 BNS mandates punishment with imprisonment up to 3 years, fine, or both. Immediate registration of FIR is required."
+          };
+        case "Cybercrime / Fraud":
+          return {
+            ipc: "Section 420 IPC (Cheating) & Sec 66D IT Act (Impersonation)",
+            bns: "Section 318 BNS (Cheating) & Section 66D Information Technology Act",
+            severity: "HIGH",
+            desc: "Cognizable. Scams involving online financial fraud should be registered immediately. Contacting 1930 within the Golden Hour freezes funds."
+          };
+        case "Assault / Violence":
+          return {
+            ipc: "Section 323 IPC (Voluntarily causing hurt) & Section 351 IPC (Assault)",
+            bns: "Section 115 BNS (Voluntarily causing hurt) & Section 131 BNS (Assault)",
+            severity: "HIGH",
+            desc: "Cognizable. Imprisonment up to 1 year. Obtaining a Medico-Legal Case (MLC) report from a government hospital is highly recommended."
+          };
+        case "Harassment / Stalking":
+          return {
+            ipc: "Section 354D IPC (Stalking) & Section 509 IPC (Word/gesture to insult modesty)",
+            bns: "Section 78 BNS (Stalking) & Section 79 BNS (Insulting modesty of a woman)",
+            severity: "HIGH",
+            desc: "Cognizable. First conviction is bailable. FIR must be recorded by a female officer. Victim anonymity is protected by law."
+          };
+        default:
+          return {
+            ipc: "Relevant sections of IPC",
+            bns: "Relevant sections of BNS, 2023",
+            severity: "MEDIUM",
+            desc: "Police will determine the exact legal sections upon verification of physical statement."
+          };
+      }
+    };
+
+    const TRANSLATED_COMPLAINT = {
+      en: {
+        headerTitle: "FORM I - FIRST INFORMATION REPORT COMPLAINT DRAFT",
+        headerSub: "(Recorded Under Section 154 of Cr.P.C / Section 173 of Bharatiya Nyaya Sanhita, 2023)",
+        section1: "1. DISTRICT & PRECINCT AREA",
+        state: "State: Maharashtra",
+        district: "District: Mumbai City Division",
+        station: "Police Precinct: Sakinaka Police Station",
+        refNo: "Draft Code Reference: SMART_FIR_SECURE_",
+        section2: "2. COMPLAINANT IDENTIFICATION",
+        name: "Full Name:",
+        phone: "Mobile Phone:",
+        city: "Address/City:",
+        section3: "3. TIMELINE & LOCATION OF OFFENCE",
+        incidentDate: "Occurrence Date/Time:",
+        incidentLoc: "Exact Location:",
+        witness: "Witness Details:",
+        accused: "Suspect/Accused Information:",
+        section4: "4. FORMAL STATEMENT DESCRIPTION",
+        section5: "5. RECORDED SYSTEM QUESTIONNAIRE RECORDS",
+        section6: "6. prima facie LEGAL MATRIX APPLICABLE",
+        severity: "Severity Level:",
+        bnsCode: "BNS 2023 Section:",
+        ipcCode: "IPC 1860 Section:",
+        note: "Legal Offense Notes:",
+        section7: "7. SECURED EVIDENCE VAULT RECORDS",
+        fileLabel: "File Index:",
+        declaration: "DECLARATION: This document is an AI-generated guidance draft to assist in filing a formal police complaint. This draft does not constitute automatic FIR filing until submitted, verified, and signed by an authorized Police Officer at a registered police precinct.",
+        signatureComplainant: "Signature of Complainant",
+        signatureOfficer: "Draft Verification Seal"
+      },
+      hi: {
+        headerTitle: "फॉर्म I - प्रथम सूचना रिपोर्ट (FIR) शिकायत का मसौदा",
+        headerSub: "(दंड प्रक्रिया संहिता की धारा 154 / भारतीय नागरिक सुरक्षा संहिता, 2023 की धारा 173 के तहत)",
+        section1: "1. जिला एवं पुलिस स्टेशन विवरण",
+        state: "राज्य: महाराष्ट्र",
+        district: "जिला: मुंबई शहर प्रभाग",
+        station: "पुलिस स्टेशन: साकीनाका पुलिस स्टेशन",
+        refNo: "मसौदा संदर्भ संख्या: SMART_FIR_SECURE_",
+        section2: "2. शिकायतकर्ता का विवरण",
+        name: "पूरा नाम:",
+        phone: "मोबाइल नंबर:",
+        city: "पता/शहर:",
+        section3: "3. घटना का समय और स्थान",
+        incidentDate: "घटना की तिथि/समय:",
+        incidentLoc: "घटना का स्थान:",
+        witness: "गवाहों का विवरण:",
+        accused: "संदिग्ध/आरोपी का विवरण:",
+        section4: "4. शिकायत का विवरण",
+        section5: "5. दर्ज किए गए प्रश्नावली रिकॉर्ड",
+        section6: "6. कानूनी धाराएं (prima facie लागू)",
+        severity: "गंभीरता स्तर:",
+        bnsCode: "बीएनएस 2023 धारा:",
+        ipcCode: "आईपीसी 1860 धारा:",
+        note: "कानूनी अपराध नोट्स:",
+        section7: "7. सुरक्षित डिजिटल साक्ष्य रिकॉर्ड",
+        fileLabel: "फ़ाइल अनुक्रमणिका:",
+        declaration: "घोषणा: यह दस्तावेज़ औपचारिक पुलिस शिकायत दर्ज करने में सहायता के लिए एक एआई-जनरेटेड मार्गदर्शन मसौदा है। यह मसौदा तब तक स्वचालित एफआईआर दर्ज नहीं करता है जब तक कि इसे पंजीकृत पुलिस स्टेशन में अधिकृत पुलिस अधिकारी द्वारा प्रस्तुत, सत्यापित और हस्ताक्षरित नहीं किया जाता है।",
+        signatureComplainant: "शिकायतकर्ता के हस्ताक्षर",
+        signatureOfficer: "मसौदा सत्यापन सील"
+      }
+    };
+
+    const EMERGENCY_TRIGGERS = [
+      "help", "attack", "unsafe", "threatened", "following me",
+      "violence", "emergency", "scared", "siren", "kill", "blood",
+      "assaulted", "beating", "bachao", "mदद"
+    ];
+
+    // ----------------------------------------------------
+    // DUAL-MODE SERVICE ADAPTER (Compat wrapper)
+    // ----------------------------------------------------
+    let realAuth = null, realDb = null, realStorage = null;
+    let isFirebaseActive = false;
+
+    const savedConfig = localStorage.getItem("firebaseConfig");
+    if (window.firebase && savedConfig) {
+      try {
+        const firebaseConfig = JSON.parse(savedConfig);
+        firebase.initializeApp(firebaseConfig);
+        realAuth = firebase.auth();
+        realDb = firebase.firestore();
+        realStorage = firebase.storage();
+        isFirebaseActive = true;
+        console.log("🔥 Live Firebase linked successfully in UMD.");
+      } catch (e) {
+        console.error("Firebase UMD init failed:", e);
+      }
+    }
+
+    const mockDelay = (ms = 300) => new Promise(res => setTimeout(res, ms));
+    const getLocalColl = (k) => JSON.parse(localStorage.getItem(k) || "[]");
+    const setLocalColl = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+    const authService = {
+      isFirebaseActive: () => isFirebaseActive,
+      signUp: async (email, password, name) => {
+        if (isFirebaseActive) {
+          const creds = await realAuth.createUserWithEmailAndPassword(email, password);
+          await realDb.collection("users").doc(creds.user.uid).set({ name, phone: "", city: "", language: "en" });
+          return creds.user;
+        } else {
+          await mockDelay();
+          const users = getLocalColl("mock_users");
+          if (users.find(u => u.email === email)) throw new Error("Email already registered!");
+          const newUser = { uid: "local_" + Math.random().toString(36).substr(2, 9), email, displayName: name };
+          users.push(newUser);
+          setLocalColl("mock_users", users);
+          return newUser;
+        }
+      },
+      login: async (email, password) => {
+        if (isFirebaseActive) {
+          const creds = await realAuth.signInWithEmailAndPassword(email, password);
+          return creds.user;
+        } else {
+          await mockDelay();
+          const users = getLocalColl("mock_users");
+          const u = users.find(x => x.email === email);
+          if (!u) throw new Error("User not found locally!");
+          return u;
+        }
+      },
+      loginAsGuest: async () => {
+        await mockDelay(100);
+        return { uid: "guest_" + Math.random().toString(36).substr(2, 9), email: "guest@smartfir.in", displayName: "Guest Citizen", isAnonymous: true };
+      }
+    };
+
+    const dbService = {
+      saveUser: async (uid, data) => {
+        if (isFirebaseActive) {
+          await realDb.collection("users").doc(uid).set(data, { merge: true });
+        } else {
+          const profiles = getLocalColl("mock_profiles");
+          const idx = profiles.findIndex(p => p.userId === uid);
+          if (idx > -1) profiles[idx] = { ...profiles[idx], ...data };
+          else profiles.push({ userId: uid, ...data });
+          setLocalColl("mock_profiles", profiles);
+        }
+      },
+      getUser: async (uid) => {
+        if (isFirebaseActive) {
+          const doc = await realDb.collection("users").doc(uid).get();
+          return doc.exists ? doc.data() : null;
+        } else {
+          return getLocalColl("mock_profiles").find(p => p.userId === uid) || null;
+        }
+      },
+      saveFIRReport: async (repId, data) => {
+        if (isFirebaseActive) {
+          await realDb.collection("fir_reports").doc(repId).set(data);
+        } else {
+          const reps = getLocalColl("mock_reps");
+          reps.push({ reportId: repId, ...data });
+          setLocalColl("mock_reps", reps);
+        }
+      },
+      getUserFIRReports: async (uid) => {
+        if (isFirebaseActive) {
+          const snap = await realDb.collection("fir_reports").where("userId", "==", uid).get();
+          const arr = [];
+          snap.forEach(d => arr.push(d.data()));
+          return arr;
+        } else {
+          return getLocalColl("mock_reps").filter(r => r.userId === uid);
+        }
+      }
+    };
+
+    // ----------------------------------------------------
+    // STRUCTURED WIZARD DICTIONARY & DIRECTIVES
+    // ----------------------------------------------------
+    const WIZARD_DATA = {
+      en: {
+        safety: {
+          "Theft / Robbery": [
+            "Move to a secure public location immediately.",
+            "Do not try to chase the thief physically if they are armed or aggressive.",
+            "Check if nearby shops or streetlights have CCTV cameras covering the area."
+          ],
+          "Cybercrime / Fraud": [
+            "Call the Cyber Financial Fraud Helpline at 1930 immediately to freeze bank accounts.",
+            "Take screenshot records of fraudulent UPI transactions, chats, or emails.",
+            "Deactivate compromised accounts or change security passwords immediately."
+          ],
+          "Harassment / Stalking": [
+            "Move into a crowded area, metro station, or nearby police outpost immediately.",
+            "Alert trusted friends, family, or passengers nearby about the situation.",
+            "Call the dedicated Women Safety Helpline at 1091 for urgent dispatch."
+          ],
+          "Accident / Road Incident": [
+            "Check yourself and passengers for injuries. Move out of active traffic flow.",
+            "Note down the vehicle registration numbers (license plate) of all vehicles involved.",
+            "Take pictures of vehicular damages and the overall road condition."
+          ],
+          "Assault / Violence": [
+            "Reach a secure sanctuary or hospital immediately.",
+            "Do not engage in physical retaliations which may escalate threats.",
+            "Request people nearby to record the scene or call for police help."
+          ]
+        },
+        evidence: {
+          "Theft / Robbery": ["Photos of the spot", "CCTV video footage or details", "Original bills/purchase receipts of stolen items", "Serial numbers / IMEI certificate", "Witness statements"],
+          "Cybercrime / Fraud": ["Screenshots of fraudulent transactions", "UPI Reference Number / SMS receipts", "Fake profiles / Email headers log", "Bank account statement copy"],
+          "Harassment / Stalking": ["Threatening message screenshots / audio notes", "Call logs list with timestamps", "Witness statements of coworkers or passengers", "Photographic proof of the stalker"],
+          "Accident / Road Incident": ["Photos of vehicular impact and license plate", "Dashboard camera footage (if any)", "Eye-witness contact info", "Medical report of initial checkup"],
+          "Assault / Violence": ["Medico-Legal Case (MLC) copy", "Injury photographs", "Weapon details or descriptions", "Witness statements"]
+        },
+        documents: {
+          "Theft / Robbery": ["Valid Government Photo ID (Aadhar/Voter ID)", "Proof of ownership (invoice or warranty card)", "Mobile Box containing IMEI number (for phone theft)"],
+          "Cybercrime / Fraud": ["Valid Government Photo ID card", "Official bank account statement (highlighting fraud lines)", "Detailed chat transcript printouts"],
+          "Harassment / Stalking": ["Valid Government Photo ID card", "Threat message prints / call log printouts"],
+          "Accident / Road Incident": ["Driving License (DL)", "Vehicle Registration Certificate (RC Book)", "Valid Vehicle Insurance Policy copy", "Medical First Aid record"],
+          "Assault / Violence": ["Valid Government Photo ID card", "Medico-Legal Case (MLC) slip issued by the Government hospital"]
+        },
+        process: {
+          where: "Visit the local police station covering the offense area. If you are far away or feel unsafe, you can visit ANY station to register a 'Zero FIR' (Section 173 BNS / Section 154 CrPC).",
+          say: "Describe the incident clearly in chronological order. Avoid guessing names or facts. Stick strictly to what you saw, felt, or heard.",
+          precautions: [
+            "Read the recorded statement carefully twice before signing it.",
+            "You are legally entitled to a certified physical copy of the FIR immediately for FREE under Section 173(2) BNSS.",
+            "Never sign empty sheets or blank documents under any pressure.",
+            "Note down the 15-digit FIR number, police station name, and Investigating Officer (IO) details."
+          ]
+        }
+      },
+      hi: {
+        safety: {
+          "Theft / Robbery": [
+            "तुरंत किसी सुरक्षित और सार्वजनिक स्थान पर जाएं।",
+            "यदि चोर सशस्त्र या आक्रामक है तो उसका पीछा करने का प्रयास न करें।",
+            "आसपास की दुकानों या सड़कों पर सीसीटीवी कैमरों की तलाश करें।"
+          ],
+          "Cybercrime / Fraud": [
+            "बैंक खातों को फ्रीज करने के लिए तुरंत साइबर हेल्पलाइन 1930 पर कॉल करें।",
+            "धोखाधड़ी वाले लेनदेन, चैट या ईमेल के स्क्रीनशॉट लें।",
+            "संबद्ध खातों को निष्क्रिय करें और सुरक्षा पासवर्ड तुरंत बदलें।"
+          ],
+          "Harassment / Stalking": [
+            "तुरंत किसी भीड़भाड़ वाले इलाके, मेट्रो स्टेशन या नजदीकी पुलिस चौकी में जाएं।",
+            "स्थिति के बारे में अपने भरोसेमंद दोस्तों, परिवार या आसपास के लोगों को सचेत करें।",
+            "तत्काल पुलिस सहायता के लिए महिला सुरक्षा हेल्पलाइन 1091 पर कॉल करें।"
+          ],
+          "Accident / Road Incident": [
+            "अपनी और यात्रियों की चोटों की जांच करें। सक्रिय यातायात प्रवाह से बाहर निकलें।",
+            "शामिल सभी वाहनों के पंजीकरण नंबर (लाइसेंस प्लेट) नोट करें।",
+            "वाहनों की क्षति और सड़क की स्थिति की तस्वीरें लें।"
+          ],
+          "Assault / Violence": [
+            "तुरंत किसी सुरक्षित स्थान या अस्पताल पहुंचें।",
+            "शारीरिक हिंसा में शामिल न हों जिससे खतरा बढ़ सकता है।",
+            "आसपास के लोगों से पुलिस को फोन करने का अनुरोध करें।"
+          ]
+        },
+        evidence: {
+          "Theft / Robbery": ["घटनास्थल की तस्वीरें", "सीसीटीवी फुटेज या विवरण", "चोरी की वस्तुओं के मूल बिल/रसीदें", "सीरियल नंबर / आईएमईआई नंबर", "गवाहों के बयान"],
+          "Cybercrime / Fraud": ["धोखाधड़ी वाले लेनदेन के स्क्रीनशॉट", "यूपीआई संदर्भ संख्या / एसएमएस रसीदें", "नकली प्रोफाइल / ईमेल हेडर", "बैंक खाता विवरण की प्रति"],
+          "Harassment / Stalking": ["धमकी भरे संदेशों के स्क्रीनशॉट / ऑडियो नोट्स", "कॉल लॉग की सूची", "सहकर्मियों या आसपास के लोगों के बयान", "संदिग्ध की तस्वीरें"],
+          "Accident / Road Incident": ["वाहनों की टक्कर और नेमप्लेट की तस्वीरें", "डैशबोर्ड कैमरे का फुटेज", "चश्मदीद गवाहों के संपर्क", "प्रारंभिक चिकित्सा रिपोर्ट"],
+          "Assault / Violence": ["मेडिको-लीगल केस (MLC) प्रति", "चोटों के चित्र", "हथियार का विवरण", "गवाहों के बयान"]
+        },
+        documents: {
+          "Theft / Robbery": ["वैध सरकारी फोटो आईडी (आधार/मतदाता पहचान पत्र)", "स्वामित्व का प्रमाण (चालान या वारंटी कार्ड)", "मोबाइल फोन चोरी के मामले में आईएमईआई नंबर वाला डिब्बा"],
+          "Cybercrime / Fraud": ["वैध सरकारी फोटो आईडी कार्ड", "आधिकारिक बैंक खाता विवरण (धोखाधड़ी के लेनदेन को चिह्नित करते हुए)", "चैट ट्रांसक्रिप्ट का प्रिंटआउट"],
+          "Harassment / Stalking": ["वैध सरकारी फोटो आईडी कार्ड", "धमकी भरे संदेशों / कॉल लॉग का प्रिंटआउट"],
+          "Accident / Road Incident": ["ड्राइविंग लाइसेंस (DL)", "वाहन पंजीकरण प्रमाणपत्र (RC बुक)", "वैध वाहन बीमा पॉलिसी की प्रति", "प्राथमिक चिकित्सा रिकॉर्ड"],
+          "Assault / Violence": ["वैध सरकारी फोटो आईडी कार्ड", "सरकारी अस्पताल द्वारा जारी मेडिको-लीगल केस (MLC) पर्ची"]
+        },
+        process: {
+          where: "घटना क्षेत्र को कवर करने वाले स्थानीय पुलिस स्टेशन पर जाएं। यदि आप दूर हैं या असुरक्षित महसूस करते हैं, तो आप 'जीरो एफआईआर' (धारा 173 बीएनएस) दर्ज करने के लिए किसी भी पुलिस स्टेशन पर जा सकते हैं।",
+          say: "घटना का क्रमबद्ध और स्पष्ट वर्णन करें। तथ्यों का अनुमान लगाने से बचें। केवल वही कहें जो आपने देखा या सुना हो।",
+          precautions: [
+            "हस्ताक्षर करने से पहले दर्ज किए गए बयान को दो बार ध्यान से पढ़ें।",
+            "आप कानूनन धारा 173(2) बीएनएसएस के तहत तुरंत एफआईआर की एक प्रमाणित भौतिक प्रति मुफ्त में पाने के हकदार हैं।",
+            "किसी भी दबाव में खाली कागजात पर हस्ताक्षर कभी न करें।",
+            "15-अंकीय एफआईआर नंबर, पुलिस स्टेशन का नाम और जांच अधिकारी (IO) का विवरण नोट करें।"
+          ]
+        }
+      },
+      mr: {
+        safety: {
+          "Theft / Robbery": [
+            "त्वरित सुरक्षित सार्वजनिक ठिकाणी जा.",
+            "चोर सशस्त्र किंवा आक्रमक असल्यास त्याचा पाठलाग करण्याचा प्रयत्न करू नका.",
+            "आसपासच्या दुकानांमध्ये सीसीटीव्ही कॅमेरे आहेत का ते तपासा."
+          ],
+          "Cybercrime / Fraud": [
+            "बँक खाती फ्रीज करण्यासाठी त्वरित सायबर हेल्पलाइन १९३० वर कॉल करा.",
+            "धोकादायक व्यवहारांचे आणि चॅट्सचे स्क्रीनशॉट घ्या.",
+            "सुरक्षा पासवर्ड त्वरित बदला."
+          ],
+          "Harassment / Stalking": [
+            "त्वरित गर्दीच्या ठिकाणी किंवा जवळच्या पोलीस चौकीमध्ये जा.",
+            "मित्र किंवा कुटुंबातील सदस्यांना याबद्दल त्वरित कळवा.",
+            "महिला सुरक्षा हेल्पलाइन १०९१ वर कॉल करा."
+          ],
+          "Accident / Road Incident": [
+            "स्वतःला आणि प्रवाशांना झालेल्या दुखापती तपासा. वाहतुकीपासून लांब जा.",
+            "अपघातात सामील असलेल्या वाहनांचे नंबर नोट करा.",
+            "वाहनांच्या नुकसानीचे फोटो घ्या."
+          ],
+          "Assault / Violence": [
+            "त्वरित सुरक्षित ठिकाणी किंवा रुग्णालयात जा.",
+            "शारीरिक वादात अडकू नका.",
+            "जवळच्या लोकांना पोलिसांना पाचारण करण्यास सांगा."
+          ]
+        },
+        evidence: {
+          "Theft / Robbery": ["घटनास्थळाचे फोटो", "सीसीटीव्ही फुटेज याबद्दल माहिती", "चोरी झालेल्या वस्तूंचे मूळ खरेदी बिल", "मोबाईलचा आयएमईआय नंबर", "प्रत्यक्षदर्शींचे संपर्क"],
+          "Cybercrime / Fraud": ["धोकादायक व्यवहारांचे स्क्रीनशॉट", "यूपीआय संदर्भ क्रमांक / बँक रसीद", "बँक खात्याचे स्टेटमेंट"],
+          "Harassment / Stalking": ["धमकीचे संदेश स्क्रीनशॉट / ऑडिओ रेकॉर्डिंग", "कॉल लॉग", "सहकाऱ्यांचे किंवा प्रत्यक्षदर्शींचे जबाब"],
+          "Accident / Road Incident": ["वाहनांचे आणि नंबर प्लेटचे फोटो", "डॅशबोर्ड कॅमेरा फुटेज", "प्रत्यक्षदर्शींचे संपर्क"],
+          "Assault / Violence": ["मेडिको-लीगल केस (MLC) प्रत", "दुखापतींचे फोटो", "वापरलेल्या शस्त्रांचे वर्णन"]
+        },
+        documents: {
+          "Theft / Robbery": ["वैध सरकारी फोटो ओळखपत्र (आधार/मतदान कार्ड)", "खरेदी बिल किंवा वॉरंटी कार्ड", "मोबाईल चोरीसाठी बॉक्स (IMEI सह)"],
+          "Cybercrime / Fraud": ["वैध सरकारी फोटो ओळखपत्र", "बँक स्टेटमेंट", "चॅटचे प्रिंटआउट्स"],
+          "Harassment / Stalking": ["वैध सरकारी फोटो ओळखपत्र", "धमकीचे संदेश/कॉल लॉग प्रिंटआउट्स"],
+          "Accident / Road Incident": ["ड्रायव्हिंग लायसन्स (DL)", "वाहन नोंदणी प्रमाणपत्र (RC)", "वाहन विमा पॉलिसी प्रत", "वैद्यकीय उपचार अहवाल"],
+          "Assault / Violence": ["वैध सरकारी फोटो ओळखपत्र", "सरकारी रुग्णालयाची मेडिको-लीगल केस (MLC) पावती"]
+        },
+        process: {
+          where: "घटना घडलेल्या स्थानिक पोलीस स्टेशनला भेट द्या. आपण दूर असल्यास, कोणत्याही पोलीस स्टेशनमध्ये 'झिरो एफआयआर' (कलम १७३ बीएनएस) दाखल करू शकता.",
+          say: "घटनेचे स्पष्ट आणि कालक्रमानुसार वर्णन करा. तथ्ये किंवा नावांचा अंदाज लावणे टाळा. जे घडले तेच सांगा.",
+          precautions: [
+            "स्वाक्षरी करण्यापूर्वी नोंदवलेला जबाब काळजीपूर्वक वाचा.",
+            "कलम १७३(२) बीएनएसएस अंतर्गत आपल्याला एफआयआरची प्रमाणित प्रत त्वरित विनामूल्य मिळण्याचा अधिकार आहे.",
+            "कशाही परिस्थितीत कोऱ्या कागदावर स्वाक्षरी करू नका.",
+            "१५ अंकी एफआयआर क्रमांक, पोलीस स्टेशनचे नाव आणि तपास अधिकाऱ्याचे तपशील लिहून ठेवा."
+          ]
+        }
+      }
+    };
+
+    // ----------------------------------------------------
+    // ROOT REACT APPLICATION COMPONENT
+    // ----------------------------------------------------
+    function App() {
+      // Navigation screen state
+      const [currentScreen, setCurrentScreen] = useState('splash'); // splash, auth, dashboard, chat, classification, questions, rights, preview, pdfsuccess, locker, locator, sos, stepwizard
+      const [language, setLanguage] = useState('en');
+      const [currentUser, setCurrentUser] = useState(null);
+      const [userProfile, setUserProfile] = useState({ name: 'Anonymous Citizen', phone: '', city: '', language: 'en' });
+
+      // Step-by-Step Guidance Wizard State
+      const [wizardCategory, setWizardCategory] = useState(null); // 'Theft / Robbery', 'Cybercrime / Fraud', 'Harassment / Stalking', 'Accident / Road Incident', 'Assault / Violence'
+      const [wizardStep, setWizardStep] = useState(1);
+      const [wizardEvidenceChecked, setWizardEvidenceChecked] = useState({});
+      const [wizardDocsChecked, setWizardDocsChecked] = useState({});
+      const [wizardForm, setWizardForm] = useState({
+        incidentDate: new Date().toISOString().slice(0, 16),
+        incidentLocation: '',
+        incidentDesc: '',
+        witnessName: '',
+        accusedDesc: ''
+      });
+
+
+      // Auth forms inputs
+      const [authTab, setAuthTab] = useState('login'); // login, register, otp
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [registerName, setRegisterName] = useState('');
+      const [phone, setPhone] = useState('');
+      const [otpCode, setOtpCode] = useState('');
+      const [otpSent, setOtpSent] = useState(false);
+      const [authError, setAuthError] = useState('');
+
+      // Chatbot conversational state
+      const [chatHistory, setChatHistory] = useState([]);
+      const [userInput, setUserInput] = useState('');
+      const [isTyping, setIsTyping] = useState(false);
+      const [showWarning, setShowWarning] = useState(false);
+      const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+
+      // Dynamic Chatbot States
+      const [chatStage, setChatStage] = useState('intro'); // intro, confirming, questioning, completed
+      const [chatCategory, setChatCategory] = useState(null);
+      const [chatQuestionIdx, setChatQuestionIdx] = useState(0);
+      const [chatQuestionsList, setChatQuestionsList] = useState([]);
+
+      // Siren and Web Audio variables
+      const [isPlayingSiren, setIsPlayingSiren] = useState(false);
+      const audioCtxRef = useRef(null);
+      const oscRef = useRef(null);
+      const lfoRef = useRef(null);
+
+      // Question steps state
+      const [classifiedCategory, setClassifiedCategory] = useState("Other");
+      const [severity, setSeverity] = useState("MEDIUM");
+      const [guidedQuestions, setGuidedQuestions] = useState([]);
+      const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
+
+      // Dynamic Complainant answers accumulation
+      const [answers, setAnswers] = useState({
+        complainantName: "Anonymous Citizen",
+        complainantPhone: "+91-XXXXXXXXXX",
+        complainantAddress: "Mumbai, MH",
+        incidentDate: new Date().toISOString().slice(0, 16),
+        incidentLocation: "Sakinaka metro junction, Mumbai",
+        witnessName: "Nearby witnesses present",
+        incidentDesc: ""
+      });
+
+      // Evidence media locker files state
+      const [evidenceFiles, setEvidenceFiles] = useState([
+        { id: 1, name: "GPS_Coordinates_Secure.txt", size: "1.5 KB", category: "Location Log", time: "Just now" }
+      ]);
+
+      // Saved reports list state
+      const [savedReports, setSavedReports] = useState([]);
+
+      // Draft document preview lang toggles
+      const [draftLangTab, setDraftLangTab] = useState('en');
+
+      // Settings config panel toggles
+      const [showDevConsole, setShowDevConsole] = useState(false);
+      const [apiConfigInput, setApiConfigInput] = useState('');
+      const [googleMapsKey, setGoogleMapsKey] = useState(localStorage.getItem('google_maps_key') || '');
+      const [openAIApiKey, setOpenAIApiKey] = useState(localStorage.getItem('openai_key') || '');
+
+      const text = LOCALIZATION[language] || LOCALIZATION['en'];
+
+      // Sync Saved drafts
+      useEffect(() => {
+        if (currentUser) {
+          dbService.getUserFIRReports(currentUser.uid).then(data => setSavedReports(data));
+        }
+      }, [currentUser, currentScreen]);
+
+      // Synthesize Emergency Siren sweep
+      const triggerAudioSiren = () => {
+        if (isPlayingSiren) {
+          if (oscRef.current) try { oscRef.current.stop(); } catch (e) { }
+          if (lfoRef.current) try { lfoRef.current.stop(); } catch (e) { }
+          if (audioCtxRef.current) try { audioCtxRef.current.close(); } catch (e) { }
+          audioCtxRef.current = null;
+          oscRef.current = null;
+          setIsPlayingSiren(false);
+        } else {
+          try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            audioCtxRef.current = audioCtx;
+
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(500, audioCtx.currentTime);
+            oscRef.current = osc;
+
+            const lfo = audioCtx.createOscillator();
+            lfo.frequency.setValueAtTime(2.0, audioCtx.currentTime);
+            lfoRef.current = lfo;
+
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.setValueAtTime(150, audioCtx.currentTime);
+
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            lfo.start();
+            osc.start();
+            setIsPlayingSiren(true);
+          } catch (e) {
+            console.error("Audio Context blocked", e);
+            setIsPlayingSiren(true);
+          }
+        }
+      };
+
+      // Text-to-speech Audio guide
+      const speakText = (txt) => {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(txt);
+          if (language === 'hi') utterance.lang = 'hi-IN';
+          else if (language === 'mr') utterance.lang = 'mr-IN';
+          else utterance.lang = 'en-IN';
+          window.speechSynthesis.speak(utterance);
+        }
+      };
+
+      // OpenAI API Wrapper
+      const fetchOpenAIResponse = async (historyArr, newText) => {
+        if (!openAIApiKey) return null;
+
+        const systemPrompt = `You are the Smart FIR Legal AI Companion for India. Guide the citizen empathetically to draft an FIR based on BNS 2023. Speak in their chosen language (${language === 'hi' ? 'Hindi' : language === 'mr' ? 'Marathi' : 'English'}). 
+If you detect the incident category (Theft / Robbery, Cybercrime / Fraud, Assault / Violence, Harassment / Stalking), strictly append the exact tag [CAT: CategoryName] at the very end of your response. 
+If you have gathered enough details (Date, Location, and Description of the incident), strictly append the exact tag [STATUS: READY] at the very end of your response so the system can generate the PDF.
+Keep your responses short, calm, and highly professional. Do not ask more than one question at a time.`;
+
+        const messages = [
+          { role: "system", content: systemPrompt },
+          ...historyArr.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({
+            role: m.role,
+            content: m.text.replace(/\[CAT:.*?\]/g, '').replace(/\[STATUS: READY\]/g, '').trim()
+          })),
+          { role: "user", content: newText }
+        ];
+
+        try {
+          const res = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${openAIApiKey}`
+            },
+            body: JSON.stringify({
+              model: "gpt-3.5-turbo",
+              messages: messages,
+              temperature: 0.7,
+              max_tokens: 300
+            })
+          });
+
+          if (!res.ok) throw new Error("API Error");
+          const data = await res.json();
+          return data.choices[0].message.content;
+        } catch (e) {
+          console.error("OpenAI Error:", e);
+          return null; // triggers fallback
+        }
+      };
+
+      // NLP Real-time Text Parser Helper
+      const parseIncidentText = (text) => {
+        const lowerText = text.toLowerCase();
+        const extracted = {};
+
+        // Timeline extraction
+        const timePatterns = /(yesterday|last night|today|at \d{1,2}(?::\d{2})?\s*(am|pm)?|around \d{1,2}(?::\d{2})?\s*(am|pm)?|on \d{1,2}(st|nd|rd|th)? \w+)/i;
+        const timeMatch = text.match(timePatterns);
+        if (timeMatch) extracted.incidentDate = "Detected: " + timeMatch[0];
+
+        // Location extraction
+        const locPatterns = /(?:at|near|outside|in|opposite) ([a-zA-Z0-9\s]+(?:metro|gate|station|street|road|junction|nagar|complex|mall|shop))/i;
+        const locMatch = text.match(locPatterns);
+        if (locMatch) extracted.incidentLocation = "Detected: " + locMatch[1].trim();
+
+        // Witness/Suspect basic extraction
+        if (lowerText.includes("wearing") || lowerText.includes("tall") || lowerText.includes("short") || lowerText.includes("number plate")) {
+          extracted.accusedDesc = "Detected suspect details from text";
+        }
+
+        return extracted;
+      };
+
+      // FIR Readiness Calculators
+      const getCompleteness = () => {
+        let score = 0;
+        if (userProfile.name && userProfile.name !== "Anonymous Citizen") score += 20;
+        if (answers.incidentDate && !answers.incidentDate.includes("T")) score += 20;
+        else if (answers.incidentDate) score += 10;
+        if (answers.incidentLocation && answers.incidentLocation !== "Sakinaka metro junction, Mumbai") score += 20;
+        if (answers.incidentDesc && answers.incidentDesc.length >= 15) score += 30;
+        if (answers.witnessName || answers.accusedDesc) score += 10;
+        return score > 100 ? 100 : score;
+      };
+
+      const getMissingFields = () => {
+        const missing = [];
+        if (!userProfile.name || userProfile.name === "Anonymous Citizen") missing.push(language === 'en' ? "Complainant Name" : language === 'hi' ? "शिकायतकर्ता का नाम" : "तक्रारदाराचे नाव");
+        if (!answers.incidentDate || answers.incidentDate.includes("T")) missing.push(language === 'en' ? "Exact Date/Time" : language === 'hi' ? "सटीक तिथि/समय" : "अचूक वेळ");
+        if (!answers.incidentLocation || answers.incidentLocation === "Sakinaka metro junction, Mumbai") missing.push(language === 'en' ? "Place of Occurrence" : language === 'hi' ? "घटना का स्थान" : "घटनेचे ठिकाण");
+        if (!answers.incidentDesc || answers.incidentDesc.length < 15) missing.push(language === 'en' ? "Detailed Statement" : language === 'hi' ? "विस्तृत विवरण" : "तपशीलवार माहिती");
+        return missing;
+      };
+
+      // NLP classifier & State Machine response
+      const handleBotResponse = async (userText) => {
+        setIsTyping(true);
+
+        const containsEmergency = EMERGENCY_TRIGGERS.some(trigger =>
+          userText.toLowerCase().includes(trigger)
+        );
+        if (containsEmergency) {
+          setTimeout(() => {
+            setIsTyping(false);
+            setCurrentScreen('sos');
+            triggerAudioSiren();
+          }, 800);
+          return;
+        }
+
+        // security warning
+        const credentialsPattern = /\b\d{4}[ -]?\d{4}[ -]?\d{4}\b/g;
+        if (credentialsPattern.test(userText) || userText.toLowerCase().includes('otp') || userText.toLowerCase().includes('password')) {
+          setTimeout(() => {
+            setIsTyping(false);
+            setShowWarning(true);
+            setChatHistory(prev => [
+              ...prev,
+              { role: "assistant", text: language === 'hi' ? "🚨 सुरक्षा चेतावनी: आधार या पासवर्ड दर्ज न करें।" : language === 'mr' ? "🚨 सुरक्षा चेतावणी: आधार किंवा पासवर्ड देऊ नका." : "🚨 SECURITY WARNING: Never enter Aadhaar or passwords here." }
+            ]);
+          }, 1000);
+          return;
+        }
+
+        // Real-time Parsing for Visual Dashboard (Always Runs)
+        const extractedParams = parseIncidentText(userText);
+        setAnswers(prev => {
+          const updated = { ...prev };
+          if (chatStage === 'intro' || chatStage === 'confirming') {
+            updated.incidentDesc = (updated.incidentDesc + " " + userText).trim();
+          }
+          if (extractedParams.incidentDate && prev.incidentDate.includes("T")) updated.incidentDate = extractedParams.incidentDate;
+          if (extractedParams.incidentLocation && prev.incidentLocation === "Sakinaka metro junction, Mumbai") updated.incidentLocation = extractedParams.incidentLocation;
+          if (extractedParams.accusedDesc && !prev.accusedDesc) updated.accusedDesc = extractedParams.accusedDesc;
+          return updated;
+        });
+
+        // HYBRID ENGINE: OpenAI vs Offline Regex Fallback
+        if (openAIApiKey) {
+          const botReplyRaw = await fetchOpenAIResponse(chatHistory, userText);
+
+          if (botReplyRaw) {
+            setIsTyping(false);
+            let botReplyClean = botReplyRaw;
+            let detectedCat = null;
+            let isReady = false;
+
+            // Parse Hidden System Tags
+            const catMatch = botReplyRaw.match(/\[CAT:\s*(.*?)\]/);
+            if (catMatch) {
+              detectedCat = catMatch[1].trim();
+              botReplyClean = botReplyClean.replace(catMatch[0], '').trim();
+            }
+            if (botReplyRaw.includes("[STATUS: READY]")) {
+              isReady = true;
+              botReplyClean = botReplyClean.replace(/\[STATUS: READY\]/g, '').trim();
+            }
+
+            if (detectedCat) {
+              // Map the GPT category guess to our internal system categories
+              let safeCat = "Other";
+              if (detectedCat.toLowerCase().includes("theft") || detectedCat.toLowerCase().includes("rob")) safeCat = "Theft / Robbery";
+              else if (detectedCat.toLowerCase().includes("cyber") || detectedCat.toLowerCase().includes("fraud")) safeCat = "Cybercrime / Fraud";
+              else if (detectedCat.toLowerCase().includes("assault") || detectedCat.toLowerCase().includes("violen")) safeCat = "Assault / Violence";
+              else if (detectedCat.toLowerCase().includes("harass") || detectedCat.toLowerCase().includes("stalk")) safeCat = "Harassment / Stalking";
+              else if (detectedCat.toLowerCase().includes("accident")) safeCat = "Accident / Road Incident";
+
+              setChatCategory(safeCat);
+              setClassifiedCategory(safeCat);
+              const legalDetails = getLegalSections(safeCat);
+              setSeverity(legalDetails.severity);
+              setChatStage('confirming');
+
+              setChatHistory(prev => [
+                ...prev,
+                { role: "assistant", text: botReplyClean, isClassificationPrompt: true, categorySuggested: safeCat }
+              ]);
+            } else if (isReady) {
+              setChatStage('completed');
+              setChatHistory(prev => [
+                ...prev,
+                { role: "assistant", text: botReplyClean, isCompletedPrompt: true }
+              ]);
+            } else {
+              setChatHistory(prev => [
+                ...prev,
+                { role: "assistant", text: botReplyClean }
+              ]);
+            }
+            return; // Exit after handling OpenAI
+          }
+        }
+
+        // OFFLINE FALLBACK ENGINE (If no API Key or Fetch failed)
+        setTimeout(() => {
+          setIsTyping(false);
+
+          // State Machine Logic
+          if (chatStage === 'intro') {
+            let cat = "Other";
+            if (userText.toLowerCase().includes("stolen") || userText.toLowerCase().includes("theft") || userText.toLowerCase().includes("robbed") || userText.toLowerCase().includes("wallet")) {
+              cat = "Theft / Robbery";
+            } else if (userText.toLowerCase().includes("cyber") || userText.toLowerCase().includes("fraud") || userText.toLowerCase().includes("scam") || userText.toLowerCase().includes("hacked")) {
+              cat = "Cybercrime / Fraud";
+            } else if (userText.toLowerCase().includes("assault") || userText.toLowerCase().includes("fight") || userText.toLowerCase().includes("violence") || userText.toLowerCase().includes("beat")) {
+              cat = "Assault / Violence";
+            } else if (userText.toLowerCase().includes("stalk") || userText.toLowerCase().includes("harass") || userText.toLowerCase().includes("followed")) {
+              cat = "Harassment / Stalking";
+            }
+
+            setChatCategory(cat);
+            setClassifiedCategory(cat);
+            const legalDetails = getLegalSections(cat);
+            setSeverity(legalDetails.severity);
+
+            setChatStage('confirming');
+
+            let reply = `Based on your description, this incident is categorized under "${cat}".\n\nPrima Facie Sections: ${legalDetails.bns}\nAssessed Severity level: ${legalDetails.severity}.\n\nShould we proceed to gather specific details directly in this chat?`;
+            if (language === 'hi') reply = `आपके विवरण के आधार पर यह मामला "${cat}" श्रेणी में आता है।\nलागू धाराएं: ${legalDetails.bns}\nक्या हम विवरण दर्ज करने के लिए आगे बढ़ें?`;
+            if (language === 'mr') reply = `तुमच्या माहितीनुसार हे "${cat}" श्रेणीत येते.\nलागू कलमे: ${legalDetails.bns}\nआपण पुढील माहिती घेण्यास सुरुवात करूया का?`;
+
+            setChatHistory(prev => [
+              ...prev,
+              { role: "assistant", text: reply, isClassificationPrompt: true, categorySuggested: cat }
+            ]);
+          } else if (chatStage === 'questioning') {
+            // Answer the current question
+            const currentQ = chatQuestionsList[chatQuestionIdx];
+            setAnswers(prev => ({ ...prev, [currentQ.key]: userText }));
+
+            if (chatQuestionIdx < chatQuestionsList.length - 1) {
+              const nextIdx = chatQuestionIdx + 1;
+              setChatQuestionIdx(nextIdx);
+              const nextQ = chatQuestionsList[nextIdx];
+              setChatHistory(prev => [
+                ...prev,
+                { role: "assistant", text: language === 'en' ? nextQ.q : language === 'hi' ? "कृपया बताएं: " + nextQ.q : "कृपया सांगा: " + nextQ.q }
+              ]);
+            } else {
+              setChatStage('completed');
+              let reply = `Thank you. I have recorded all necessary details for your "${chatCategory}" complaint. Your FIR draft is now ready!`;
+              if (language === 'hi') reply = `धन्यवाद। मैंने आपकी "${chatCategory}" शिकायत के सभी आवश्यक विवरण दर्ज कर लिए हैं। आपका FIR मसौदा अब तैयार है!`;
+              if (language === 'mr') reply = `धन्यवाद. मी तुमच्या "${chatCategory}" तक्रारीची सर्व आवश्यक माहिती नोंदवली आहे. तुमचा FIR मसुदा तयार आहे!`;
+
+              setChatHistory(prev => [
+                ...prev,
+                { role: "assistant", text: reply, isCompletedPrompt: true }
+              ]);
+            }
+          } else if (chatStage === 'completed') {
+            setChatHistory(prev => [
+              ...prev,
+              { role: "assistant", text: language === 'en' ? "Your draft is ready. Please click 'Generate Formal FIR Draft' on the sidebar to proceed." : language === 'hi' ? "आपका मसौदा तैयार है। कृपया आगे बढ़ने के लिए 'औपचारिक FIR ड्राफ्ट तैयार करें' पर क्लिक करें।" : "मसुदा तयार आहे. 'मसुदा तयार करा' वर क्लिक करा." }
+            ]);
+          }
+
+        }, 1200);
+      };
+
+      const submitChat = () => {
+        if (!userInput.trim()) return;
+        setChatHistory(prev => [...prev, { role: "user", text: userInput }]);
+        const text = userInput;
+        setUserInput('');
+        handleBotResponse(text);
+      };
+
+      const confirmClassification = (cat) => {
+        setChatCategory(cat);
+        setClassifiedCategory(cat);
+        const qList = CATEGORY_QUESTIONS[cat] || CATEGORY_QUESTIONS["Other"];
+        setChatQuestionsList(qList);
+        setChatQuestionIdx(0);
+        setChatStage('questioning');
+
+        setChatHistory(prev => [
+          ...prev,
+          { role: "assistant", text: language === 'en' ? `Great, let's start. ${qList[0].q}` : language === 'hi' ? `चलिए शुरू करते हैं। ${qList[0].q}` : `चला सुरू करूया. ${qList[0].q}` }
+        ]);
+      };
+
+      // Authentication Submission Handler
+      const handleAuth = async (e) => {
+        e.preventDefault();
+        setAuthError('');
+        try {
+          if (authTab === 'login') {
+            const u = await authService.login(email, password);
+            setCurrentUser(u);
+            const p = await dbService.getUser(u.uid);
+            if (p) setUserProfile(p);
+            else setUserProfile({ name: u.displayName || email.split("@")[0], phone: "", city: "", language });
+            setCurrentScreen('dashboard');
+          } else if (authTab === 'register') {
+            const u = await authService.signUp(email, password, registerName);
+            setCurrentUser(u);
+            const initialP = { name: registerName, phone: "", city: "", language };
+            await dbService.saveUser(u.uid, initialP);
+            setUserProfile(initialP);
+            setCurrentScreen('dashboard');
+          }
+        } catch (err) {
+          setAuthError(err.message);
+        }
+      };
+
+      const handleOTPTrigger = (e) => {
+        e.preventDefault();
+        if (!phone || phone.length < 10) {
+          setAuthError("Enter a valid 10-digit number.");
+          return;
+        }
+        setOtpSent(true);
+        setAuthError('');
+        alert("Simulation OTP code 123456 sent via SMS to +91-" + phone);
+      };
+
+      const handleOTPVerify = async (e) => {
+        e.preventDefault();
+        if (otpCode === '123456') {
+          const guest = await authService.loginAsGuest();
+          setCurrentUser(guest);
+          setUserProfile({ name: "Citizen " + phone.slice(-4), phone, city: "Mumbai, MH", language });
+          setCurrentScreen('dashboard');
+        } else {
+          setAuthError("Incorrect code. Use 123456 to simulate.");
+        }
+      };
+
+      const handleGuestLogin = async () => {
+        const guest = await authService.loginAsGuest();
+        setCurrentUser(guest);
+        setUserProfile({ name: "Guest Citizen", phone: "", city: "Mumbai", language });
+        setCurrentScreen('dashboard');
+      };
+
+      // Secure Evidence File Upload
+      const handleFileUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        alert("Encrypting and indexing file locally.");
+        setEvidenceFiles(prev => [
+          ...prev,
+          { id: Date.now(), name: file.name, size: (file.size / 1024).toFixed(1) + " KB", category: classifiedCategory + " Proof", time: "Just now" }
+        ]);
+      };
+
+      // PDF Generation Exporter
+      const exportPDF = () => {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const legal = getLegalSections(classifiedCategory);
+        const trans = TRANSLATED_COMPLAINT[draftLangTab] || TRANSLATED_COMPLAINT['en'];
+
+        // Border Frame decoration
+        doc.rect(5, 5, 200, 287);
+        doc.rect(6.5, 6.5, 197, 284);
+
+        doc.setFillColor(26, 58, 107);
+        doc.rect(7, 7, 196, 2);
+
+        doc.setFont("Helvetica", "bold");
+        doc.setFontSize(13);
+        doc.setTextColor(26, 58, 107);
+        doc.text(trans.headerTitle, 105, 18, { align: "center" });
+
+        doc.setFontSize(8.5);
+        doc.setFont("Helvetica", "normal");
+        doc.setTextColor(80, 80, 80);
+        doc.text(trans.headerSub, 105, 23, { align: "center" });
+
+        doc.line(15, 27, 195, 27);
+
+        doc.setFontSize(9.5);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont("Helvetica", "bold");
+        doc.text(trans.section1, 15, 34);
+        doc.setFont("Helvetica", "normal");
+        doc.text(trans.state, 20, 40);
+        doc.text(trans.district, 110, 40);
+        doc.text(trans.station, 20, 46);
+
+        doc.line(15, 51, 195, 51);
+
+        doc.setFont("Helvetica", "bold");
+        doc.text(trans.section2, 15, 58);
+        doc.setFont("Helvetica", "normal");
+        doc.text(`${trans.name} ${answers.complainantName || userProfile.name}`, 20, 64);
+        doc.text(`${trans.phone} ${answers.complainantPhone || userProfile.phone || 'N/A'}`, 110, 64);
+        doc.text(`${trans.city} ${answers.complainantAddress || userProfile.city}`, 20, 70);
+
+        doc.line(15, 76, 195, 76);
+
+        doc.setFont("Helvetica", "bold");
+        doc.text(trans.section3, 15, 83);
+        doc.setFont("Helvetica", "normal");
+        doc.text(`${trans.incidentDate} ${answers.incidentDate.replace('T', ' ')}`, 20, 89);
+        doc.text(`${trans.incidentLoc} ${answers.incidentLocation}`, 20, 95);
+
+        doc.line(15, 101, 195, 101);
+
+        doc.setFont("Helvetica", "bold");
+        doc.text(trans.section4, 15, 108);
+        doc.setFont("Helvetica", "normal");
+        const splitDesc = doc.splitTextToSize(answers.incidentDesc || "Incident of " + classifiedCategory, 175);
+        doc.text(splitDesc, 20, 114);
+
+        let currentY = 114 + (splitDesc.length * 5) + 5;
+        doc.line(15, currentY, 195, currentY);
+
+        currentY += 7;
+        doc.setFont("Helvetica", "bold");
+        doc.text(trans.section6, 15, currentY);
+        doc.setFont("Helvetica", "normal");
+        currentY += 6;
+        doc.text(`${trans.severity} ${severity}`, 20, currentY);
+        currentY += 5;
+        doc.text(`${trans.bnsCode} ${legal.bns}`, 20, currentY);
+        currentY += 5;
+        doc.text(`${trans.ipcCode} ${legal.ipc}`, 20, currentY);
+        currentY += 5;
+
+        const splitNote = doc.splitTextToSize(legal.desc, 175);
+        doc.text(splitNote, 20, currentY);
+        currentY += (splitNote.length * 5) + 5;
+
+        doc.line(15, currentY, 195, currentY);
+
+        currentY += 7;
+        doc.setFont("Helvetica", "bold");
+        doc.text(trans.section7, 15, currentY);
+        doc.setFont("Helvetica", "normal");
+        currentY += 6;
+        evidenceFiles.forEach((file, index) => {
+          doc.text(`- File ${index + 1}: ${file.name} (${file.size})`, 20, currentY);
+          currentY += 5;
+        });
+
+        currentY += 10;
+        doc.setFont("Helvetica", "italic");
+        doc.setFontSize(7.5);
+        const splitDec = doc.splitTextToSize(trans.declaration, 175);
+        doc.text(splitDec, 20, currentY);
+
+        currentY += 18;
+        doc.setFont("Helvetica", "bold");
+        doc.setFontSize(9.5);
+        doc.text(trans.signatureComplainant, 20, currentY);
+        doc.text(trans.signatureOfficer, 130, currentY);
+
+        doc.save(`Smart_FIR_Complaint_${draftLangTab.toUpperCase()}.pdf`);
+
+        // Save report to localStorage list
+        if (currentUser) {
+          const reportId = "rep_" + Date.now();
+          dbService.saveFIRReport(reportId, {
+            userId: currentUser.uid,
+            incidentType: classifiedCategory,
+            incidentDate: answers.incidentDate,
+            location: answers.incidentLocation,
+            firDraft: answers
+          });
+        }
+
+        setCurrentScreen('pdfsuccess');
+      };
+
+      const saveDeveloperConfig = () => {
+        if (apiConfigInput) {
+          localStorage.setItem("firebaseConfig", apiConfigInput);
+          alert("Firebase credentials updated. App will now reload in LIVE mode!");
+          window.location.reload();
+        } else {
+          localStorage.removeItem("firebaseConfig");
+          alert("Developer config cleared. Reloading.");
+          window.location.reload();
+        }
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col justify-between">
+
+          {/* ----------------------------------------------------
+                OFFICIAL HEADER BAR
+                ---------------------------------------------------- */}
+          <header className="sticky top-0 z-50 bg-[#1A3A6B] text-white border-b-4 border-[#D97706] shadow-md px-4 py-3">
+            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+
+              <div className="flex items-center gap-3 cursor-pointer" onClick={() => {
+                if (currentUser) setCurrentScreen('dashboard');
+                else setCurrentScreen('splash');
+              }}>
+                <div className="flex items-center justify-center w-10 h-10 rounded bg-white text-[#1A3A6B] shadow">
+                  <Icon name="shield" className="w-6 h-6 text-[#1A3A6B]" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-black tracking-tight leading-none font-montserrat">{text.appName}</h1>
+                  <span className="text-[9px] text-amber-400 font-bold uppercase tracking-wider block mt-0.5">National Security Assistant</span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+
+                {/* Security Clearance Tag */}
+                <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded bg-[#12284C] text-[10px] text-emerald-400 font-mono border border-emerald-500/20">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                  {text.securityStatus}
+                </div>
+
+                {/* Bilingual language switcher */}
+                <div className="flex bg-[#12284C] p-1 rounded border border-white/10">
+                  {['en', 'hi', 'mr'].map(lang => (
+                    <button
+                      key={lang}
+                      onClick={() => setLanguage(lang)}
+                      className={`px-2 py-0.5 text-xs font-bold rounded uppercase transition-all duration-200 ${language === lang ? 'bg-[#D97706] text-white' : 'text-slate-300 hover:text-white'
+                        }`}
+                    >
+                      {lang === 'en' ? 'ENG' : lang === 'hi' ? 'हिंदी' : 'मराठी'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Dev Settings trigger */}
+                <button
+                  onClick={() => setShowDevConsole(!showDevConsole)}
+                  className="p-1.5 rounded bg-[#12284C] border border-white/10 text-slate-300 hover:text-amber-400"
+                  title="Developer Connections"
+                >
+                  <Icon name="settings" className="w-4 h-4" />
+                </button>
+
+                {currentUser && (
+                  <>
+                    {currentScreen !== 'dashboard' && (
+                      <button
+                        onClick={() => {
+                          if (currentScreen === 'sos' && isPlayingSiren) triggerAudioSiren();
+                          setCurrentScreen('dashboard');
+                        }}
+                        className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-xs font-bold flex items-center gap-1"
+                      >
+                        <Icon name="arrowLeft" className="w-3.5 h-3.5" /> Portal Home
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (isPlayingSiren) triggerAudioSiren();
+                        setCurrentUser(null);
+                        setCurrentScreen('auth');
+                      }}
+                      className="px-3 py-1 bg-red-800/80 hover:bg-red-800 text-white rounded text-xs font-bold flex items-center gap-1"
+                    >
+                      Logout
+                    </button>
+                  </>
+                )}
+
+                {/* Emergency SOS button */}
+                {currentScreen !== 'sos' && (
+                  <button
+                    onClick={() => {
+                      setCurrentScreen('sos');
+                      if (!isPlayingSiren) triggerAudioSiren();
+                    }}
+                    className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded shadow animate-pulse-red flex items-center gap-1.5"
+                  >
+                    <Icon name="alertTriangle" className="w-4 h-4 animate-bounce" />
+                    SOS PANIC
+                  </button>
+                )}
+
+              </div>
+            </div>
+          </header>
+
+          {/* ----------------------------------------------------
+                DEVELOPER INTEGRATION PANEL
+                ---------------------------------------------------- */}
+          {showDevConsole && (
+            <div className="max-w-4xl mx-auto mt-4 px-4">
+              <div className="bg-slate-900 border-2 border-[#1A3A6B] text-white p-5 rounded-2xl relative shadow-lg">
+                <button onClick={() => setShowDevConsole(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
+                  <Icon name="x" className="w-5 h-5" />
+                </button>
+                <h3 className="text-amber-400 font-mono text-sm uppercase font-black flex items-center gap-2 mb-2">
+                  <Icon name="layers" className="w-4 h-4" /> Smart FIR Developer Integration
+                </h3>
+                <p className="text-xs text-slate-300 mb-4">
+                  Connect this portal to your own Firebase client app and OpenAI API. Paste your configuration details below. If left empty, the application operates locally using secure fallback models.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Firebase Config JSON</label>
+                    <textarea
+                      value={apiConfigInput}
+                      onChange={(e) => setApiConfigInput(e.target.value)}
+                      placeholder='{"apiKey": "...", "projectId": "..."}'
+                      className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs font-mono h-[90px] text-slate-300 custom-scrollbar"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">OpenAI API Key (Secure Local)</label>
+                    <input
+                      type="password"
+                      value={openAIApiKey}
+                      onChange={(e) => setOpenAIApiKey(e.target.value)}
+                      placeholder="sk-proj-..."
+                      className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs font-mono text-slate-300 mb-2"
+                    />
+                    <p className="text-[9px] text-slate-500 italic leading-tight">Strictly saved to browser local storage. Used for the AI Hybrid Engine.</p>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Google Maps Key (Secure Local)</label>
+                    <input
+                      type="password"
+                      value={googleMapsKey}
+                      onChange={(e) => setGoogleMapsKey(e.target.value)}
+                      placeholder="AIzaSy..."
+                      className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs font-mono text-slate-300 mb-2"
+                    />
+                    <p className="text-[9px] text-slate-500 italic leading-tight">Saved locally. Used to render interactive emergency navigation maps.</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-3 border-t border-slate-800">
+                  <span className="text-[10px] text-emerald-400 font-mono">
+                    Database Connection: <span className="font-bold underline">{isFirebaseActive ? 'LIVE_FIREBASE_CONNECTED' : 'LOCAL_STORAGE_MODE'}</span>
+                  </span>
+                  <div className="flex gap-2">
+                    <button onClick={() => { setApiConfigInput(''); setOpenAIApiKey(''); setGoogleMapsKey(''); localStorage.removeItem("firebaseConfig"); localStorage.removeItem("openai_key"); localStorage.removeItem("google_maps_key"); window.location.reload(); }} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded font-bold transition-colors">Clear All</button>
+                    <button onClick={() => {
+                      if (apiConfigInput) localStorage.setItem("firebaseConfig", apiConfigInput);
+                      if (openAIApiKey) localStorage.setItem("openai_key", openAIApiKey);
+                      if (googleMapsKey) localStorage.setItem("google_maps_key", googleMapsKey);
+                      alert("Settings updated. App will now reload!");
+                      window.location.reload();
+                    }} className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black rounded transition-colors">Save & Reload</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ----------------------------------------------------
+                MAIN APP PANELS (SCREENS CONTAINER)
+                ---------------------------------------------------- */}
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 mt-6">
+
+            {/* 1. SPLASH SCREEN & LANGUAGE CARD */}
+            {currentScreen === 'splash' && (
+              <div className="min-h-[70vh] flex flex-col items-center justify-center text-center max-w-xl mx-auto">
+                <div className="relative w-28 h-28 mb-6 animate-float flex items-center justify-center rounded-full bg-white shadow-xl border-4 border-[#1A3A6B]">
+                  <Icon name="scale" className="w-14 h-14 text-[#1A3A6B]" />
+                  <Icon name="shield" className="absolute bottom-1 right-1 w-6 h-6 text-[#D97706]" />
+                </div>
+
+                <h2 className="text-3xl font-black tracking-tight text-[#1A3A6B] font-montserrat">{text.appName}</h2>
+                <p className="text-slate-600 text-sm font-medium mb-8">{text.tagline}</p>
+
+                <div className="w-full bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
+                  <p className="text-xs text-slate-500 font-mono uppercase tracking-wider mb-4">Select Communication Language / भाषा चुनें</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {['en', 'hi', 'mr'].map((lang) => (
+                      <button
+                        key={lang}
+                        onClick={() => setLanguage(lang)}
+                        className={`p-3 rounded-xl border-2 font-bold text-xs ${language === lang ? 'border-[#1A3A6B] bg-[#E8EEF5] text-[#1A3A6B]' : 'border-slate-200 hover:bg-slate-50'
+                          }`}
+                      >
+                        {lang === 'en' ? 'English' : lang === 'hi' ? 'हिंदी' : 'मराठी'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-500 font-mono italic mb-6">{text.splashLoading}</p>
+
+                <button
+                  onClick={() => {
+                    if (currentUser) setCurrentScreen('dashboard');
+                    else setCurrentScreen('auth');
+                  }}
+                  className="w-full bg-[#1A3A6B] hover:bg-[#12284C] text-white py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 shadow"
+                >
+                  {text.quickLaunch} <Icon name="arrowRight" className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            )}
+
+            {/* 2. AUTHENTICATION SCREENS */}
+            {currentScreen === 'auth' && (
+              <div className="max-w-md mx-auto">
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden mt-8">
+                  <div className="flex border-b border-slate-200 bg-slate-50">
+                    {['login', 'register', 'otp'].map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => { setAuthTab(tab); setAuthError(''); setOtpSent(false); }}
+                        className={`flex-1 py-3 text-xs font-black uppercase border-b-2 transition-all ${authTab === tab ? 'border-[#1A3A6B] text-[#1A3A6B] bg-white' : 'border-transparent text-slate-500'
+                          }`}
+                      >
+                        {tab === 'login' ? 'Email Login' : tab === 'register' ? 'New Account' : 'Mobile OTP'}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="p-6">
+                    {authError && (
+                      <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl mb-4 font-semibold">
+                        {authError}
+                      </div>
+                    )}
+
+                    {(authTab === 'login' || authTab === 'register') && (
+                      <form onSubmit={handleAuth} className="flex flex-col gap-4">
+                        {authTab === 'register' && (
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Citizen Full Name</label>
+                            <input type="text" required value={registerName} onChange={(e) => setRegisterName(e.target.value)} placeholder="e.g., Ramesh Kumar" className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs" />
+                          </div>
+                        )}
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Email Address</label>
+                          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g., ramesh@smartfir.in" className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Password</label>
+                          <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs" />
+                        </div>
+                        <button type="submit" className="w-full bg-[#1A3A6B] hover:bg-[#12284C] text-white py-3 rounded-lg text-xs font-bold mt-2">
+                          {authTab === 'login' ? 'Login Securely' : 'Create Account'}
+                        </button>
+                      </form>
+                    )}
+
+                    {authTab === 'otp' && (
+                      <div>
+                        {!otpSent ? (
+                          <form onSubmit={handleOTPTrigger} className="flex flex-col gap-4">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Mobile Phone Number (10-Digit)</label>
+                              <div className="flex">
+                                <span className="bg-slate-100 border border-slate-350 px-3 py-2 text-slate-500 rounded-l-lg text-xs font-bold flex items-center">+91</span>
+                                <input type="tel" required maxLength="10" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="9876543210" className="w-full bg-white border border-slate-300 rounded-r-lg p-2 text-xs border-l-0" />
+                              </div>
+                            </div>
+                            <button type="submit" className="w-full bg-[#1A3A6B] hover:bg-[#12284C] text-white py-3 rounded-lg text-xs font-bold">Send Verification SMS</button>
+                          </form>
+                        ) : (
+                          <form onSubmit={handleOTPVerify} className="flex flex-col gap-4">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Enter 6-Digit Verification Code</label>
+                              <input type="text" required maxLength="6" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder="Enter 123456 to verify" className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-center font-bold tracking-widest text-lg" />
+                            </div>
+                            <button type="submit" className="w-full bg-[#1A3A6B] hover:bg-[#12284C] text-white py-3 rounded-lg text-xs font-bold">Verify & Login</button>
+                          </form>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="border-t border-slate-100 my-5 pt-4 text-center">
+                      <p className="text-[10px] text-slate-400 mb-2">No account required? Save reports locally</p>
+                      <button onClick={handleGuestLogin} className="w-full py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all">Proceed as Guest</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 3. CITIZEN DASHBOARD */}
+            {currentScreen === 'dashboard' && (
+              <div>
+                <div className="bg-white border border-slate-200 p-5 rounded-2xl mb-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded bg-[#E8EEF5] text-[#1A3A6B] flex items-center justify-center border border-[#1A3A6B]/20">
+                      <Icon name="user" className="w-5 h-5 text-[#1A3A6B]" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                        {userProfile.name}
+                        <span className="text-[8px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold uppercase">{currentUser?.isAnonymous ? 'Guest Mode' : 'Verified'}</span>
+                      </h3>
+                      <p className="text-[10px] text-slate-500 font-mono mt-0.5">{text.activeLocation}</p>
+                    </div>
+                  </div>
+
+                  <span className="text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1 rounded-lg font-mono font-bold">
+                    Storage: {isFirebaseActive ? 'Live Cloud Sync' : 'Secure Local Storage'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-12 gap-6">
+
+                  {/* Left Actions */}
+                  <div className="col-span-12 lg:col-span-8 flex flex-col gap-6">
+
+                    {/* Big Assistant Box */}
+                    <div className="bg-white border-2 border-[#1A3A6B] p-6 rounded-3xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-[#E8EEF5] text-[#1A3A6B] flex items-center justify-center shrink-0 border border-[#1A3A6B]/20">
+                          <Icon name="messageSquare" className="w-6 h-6 text-[#1A3A6B]" />
+                        </div>
+                        <div>
+                          <h4 className="text-base font-black text-slate-800">{text.startAssistant}</h4>
+                          <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-lg">
+                            Our empathetic assistant guides you through compiling an official FIR complaint copy, matching incident parameters directly with the Bharatiya Nyaya Sanhita (BNS), 2023 legal sections.
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setChatHistory([
+                            { role: "assistant", text: "Jai Hind! I am your supportive Legal Companion. Please describe the incident in simple words. For your safety, do not input Aadhaar or bank passwords." }
+                          ]);
+                          setCurrentScreen('chat');
+                        }}
+                        className="bg-[#1A3A6B] hover:bg-[#12284C] text-white px-6 py-3 rounded-xl text-xs font-bold shrink-0 shadow flex items-center gap-1"
+                      >
+                        Start Guide <Icon name="chevronRight" className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
+
+                    {/* Interactive Step-by-Step FIR Wizard Launcher */}
+                    <div className="bg-white border-2 border-[#D97706] p-6 rounded-3xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center shrink-0 border border-[#D97706]/20">
+                          <Icon name="layers" className="w-6 h-6 text-[#D97706]" />
+                        </div>
+                        <div>
+                          <h4 className="text-base font-black text-slate-800">
+                            {language === 'en' ? 'Step-by-Step FIR Guidance System' : language === 'hi' ? 'चरण-दर-चरण FIR शिकायत प्रणाली' : 'पायरी-बाय-पायरी FIR तक्रार प्रणाली'}
+                          </h4>
+                          <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-lg">
+                            {language === 'en'
+                              ? 'Navigate through a highly structured 7-step visual workflow. Check off incident evidence, compile required legal documents, prepare complaints and locate stations.'
+                              : language === 'hi'
+                                ? 'एक अत्यधिक संरचित 7-चरण दृश्य शिकायत प्रणाली का पालन करें। साक्ष्य एकत्र करें, आवश्यक दस्तावेज सूचीबद्ध करें और विवरण दर्ज करें।'
+                                : 'अत्यंत सुव्यवस्थित ७-पायऱ्यांच्या कायदेशीर प्रणालीचे पालन करा. पुरावे तपासा, आवश्यक कागदपत्रे संकलित करा आणि पोलीस ठाणे शोधा.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setWizardCategory(null);
+                          setWizardStep(1);
+                          setWizardEvidenceChecked({});
+                          setWizardDocsChecked({});
+                          setWizardForm({
+                            incidentDate: new Date().toISOString().slice(0, 16),
+                            incidentLocation: answers.incidentLocation || '',
+                            incidentDesc: answers.incidentDesc || '',
+                            witnessName: answers.witnessName || '',
+                            accusedDesc: ''
+                          });
+                          setCurrentScreen('stepwizard');
+                        }}
+                        className="bg-[#D97706] hover:bg-[#B45309] text-white px-6 py-3 rounded-xl text-xs font-bold shrink-0 shadow flex items-center gap-1 transition-all duration-200"
+                      >
+                        {language === 'en' ? 'Launch Wizard' : language === 'hi' ? 'विज़ार्ड शुरू करें' : 'विझार्ड सुरू करा'} <Icon name="chevronRight" className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
+
+                    {/* Evidence Locker */}
+                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                      <h4 className="text-xs font-black text-slate-800 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2 uppercase tracking-wider">
+                        <Icon name="lock" className="w-4 h-4 text-[#1A3A6B]" />
+                        {text.lockerTitle}
+                      </h4>
+                      <p className="text-xs text-slate-500 mb-4">{text.lockerSub}</p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                        {evidenceFiles.map((file) => (
+                          <div key={file.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+                            <div className="truncate">
+                              <p className="font-bold text-slate-700 truncate">{file.name}</p>
+                              <p className="text-[9px] text-slate-400 font-mono">{file.size} &bull; {file.category}</p>
+                            </div>
+                            <Icon name="check" className="w-4 h-4 text-emerald-600 shrink-0 ml-2" />
+                          </div>
+                        ))}
+                      </div>
+
+                      <button onClick={() => setCurrentScreen('locker')} className="w-full p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5">
+                        Open Vault Locker <Icon name="arrowRight" className="w-3.5 h-3.5 text-slate-700" />
+                      </button>
+                    </div>
+
+                    {/* Saved Drafts */}
+                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                      <h4 className="text-xs font-black text-slate-800 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2 uppercase tracking-wider">
+                        <Icon name="fileText" className="w-4 h-4 text-[#1A3A6B]" />
+                        My Saved Drafts & History
+                      </h4>
+
+                      {savedReports.length === 0 ? (
+                        <p className="text-xs text-slate-400 py-3 text-center italic">No drafts saved yet. Complete a guided flow to generate reports.</p>
+                      ) : (
+                        <div className="flex flex-col gap-3">
+                          {savedReports.map((rep, idx) => (
+                            <div key={idx} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-4 text-xs">
+                              <div>
+                                <p className="font-black text-slate-800">{rep.incidentType} Complaint</p>
+                                <p className="text-[9px] text-slate-400 mt-1 font-mono">Location: {rep.location} &bull; Date: {rep.incidentDate.replace('T', ' ')}</p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setAnswers(rep.firDraft);
+                                  setClassifiedCategory(rep.incidentType);
+                                  setCurrentScreen('preview');
+                                }}
+                                className="px-3 py-1.5 bg-[#1A3A6B] hover:bg-[#12284C] text-white rounded text-[10px] font-bold flex items-center gap-1"
+                              >
+                                <Icon name="eye" className="w-3.5 h-3.5 text-white" /> View Draft
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+
+                  {/* Right Hand side tools */}
+                  <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+
+                    {/* Interactive map locator */}
+                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                      <h4 className="text-xs font-black text-slate-800 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2 uppercase tracking-wider">
+                        <Icon name="mapPin" className="w-4.5 h-4.5 text-[#1A3A6B]" />
+                        {text.locatorTitle}
+                      </h4>
+
+                      <div className="relative w-full h-36 bg-slate-100 rounded-xl overflow-hidden mb-4 border border-slate-200">
+                        <iframe
+                          title="Precinct Locator Map"
+                          width="100%"
+                          height="144"
+                          frameBorder="0"
+                          style={{ border: 0 }}
+                          src={`https://www.google.com/maps/embed/v1/place?key=${googleMapsKey || 'AIzaSyDummyKeyForStaticFallback'}&q=Sakinaka+Police+Station,Mumbai+Maharashtra&zoom=14`}
+                          allowFullScreen
+                          className="absolute inset-0"
+                        />
+                      </div>
+
+                      <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs flex justify-between items-center mb-3">
+                        <div>
+                          <p className="font-bold text-slate-700">Sakinaka Police HQ</p>
+                          <p className="text-[9px] text-slate-400">Distance: 0.8 km &bull; 022-28522222</p>
+                        </div>
+                        <Icon name="phone" className="w-4 h-4 text-[#1A3A6B] cursor-pointer" onClick={() => alert("Calling hotline: 022-28522222")} />
+                      </div>
+
+                      <button onClick={() => setCurrentScreen('locator')} className="w-full p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5">
+                        Open Interactive Maps <Icon name="arrowRight" className="w-3.5 h-3.5 text-slate-700" />
+                      </button>
+                    </div>
+
+                    {/* Citizen rights card */}
+                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                      <h4 className="text-xs font-black text-slate-800 border-b border-slate-100 pb-3 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                        <Icon name="scale" className="w-4.5 h-4.5 text-[#1A3A6B]" />
+                        {text.rightsHandbook}
+                      </h4>
+                      <div className="flex flex-col gap-3">
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                          <p className="font-bold text-[#1A3A6B]">Right to Zero FIR</p>
+                          <p className="text-[9px] text-slate-400 mt-1">You can register a complaint at ANY police station regardless of jurisdiction. It will be recorded and forwarded internally.</p>
+                        </div>
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                          <p className="font-bold text-[#1A3A6B]">Free Copy Right</p>
+                          <p className="text-[9px] text-slate-400 mt-1">Section 154(2) of CrPC mandates that police provide a certified free physical copy of your FIR immediately.</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Profile details */}
+                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                      <h4 className="text-xs font-black text-slate-800 border-b border-slate-100 pb-3 mb-3 uppercase tracking-wider">Complainant Profile</h4>
+                      <div className="flex flex-col gap-2">
+                        <div>
+                          <label className="block text-[8px] font-bold text-slate-400 uppercase">Complainant Name</label>
+                          <input type="text" value={userProfile.name} onChange={(e) => {
+                            const updated = { ...userProfile, name: e.target.value };
+                            setUserProfile(updated);
+                            if (currentUser) dbService.saveUser(currentUser.uid, updated);
+                          }} className="w-full bg-white border border-slate-200 rounded p-1 text-xs" />
+                        </div>
+                        <div>
+                          <label className="block text-[8px] font-bold text-slate-400 uppercase">Phone</label>
+                          <input type="text" value={userProfile.phone} onChange={(e) => {
+                            const updated = { ...userProfile, phone: e.target.value };
+                            setUserProfile(updated);
+                            if (currentUser) dbService.saveUser(currentUser.uid, updated);
+                          }} className="w-full bg-white border border-slate-200 rounded p-1 text-xs" />
+                        </div>
+                        <div>
+                          <label className="block text-[8px] font-bold text-slate-400 uppercase">Address</label>
+                          <input type="text" value={userProfile.city} onChange={(e) => {
+                            const updated = { ...userProfile, city: e.target.value };
+                            setUserProfile(updated);
+                            if (currentUser) dbService.saveUser(currentUser.uid, updated);
+                          }} className="w-full bg-white border border-slate-200 rounded p-1 text-xs" />
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+            {/* 4. AI CHAT COMPANION WITH REAL-TIME NLP READINESS DASHBOARD */}
+            {currentScreen === 'chat' && (
+              <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                {/* Left Column: Chat History & Input */}
+                <div className="lg:col-span-8 flex flex-col">
+                  <div className="bg-white border border-slate-200 rounded-t-3xl border-b-2 border-b-[#1A3A6B] p-4 flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-[#E8EEF5] flex items-center justify-center border border-[#1A3A6B]/20">
+                        <Icon name="shield" className="w-5 h-5 text-[#1A3A6B]" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-800">Legal AI Companion</h4>
+                        <span className="text-[9px] text-[#1A3A6B] font-bold flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded bg-[#1A3A6B] animate-ping"></div> Active guide
+                        </span>
+                      </div>
+                    </div>
+                    <button onClick={() => speakText("Describe the legal incident, and I will assist you in drafting your FIR copy.")} className="p-2 bg-slate-50 border border-slate-200 text-slate-600 rounded hover:bg-[#E8EEF5] transition-colors">
+                      <Icon name="volume2" className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="h-[460px] overflow-y-auto bg-white border border-slate-200 border-t-0 p-6 flex flex-col gap-4 custom-scrollbar shadow-inner relative">
+                    {chatHistory.length === 0 && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center opacity-80">
+                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4 shadow-sm border border-slate-200">
+                          <Icon name="messageSquare" className="w-8 h-8 text-[#1A3A6B]" />
+                        </div>
+                        <h3 className="font-bold text-slate-800 mb-2">Welcome to your Smart FIR Assistant</h3>
+                        <p className="text-xs text-slate-500 max-w-sm leading-relaxed">Describe the incident you want to report below. I will analyze your statement, detect key details like date and location automatically, and guide you through the process.</p>
+                      </div>
+                    )}
+
+                    {chatHistory.map((msg, i) => (
+                      <div key={i} className={`flex flex-col max-w-[85%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'} z-10`}>
+                        <div className={`p-4 rounded-2xl text-xs leading-relaxed ${msg.role === 'user' ? 'bg-[#1A3A6B] text-white font-semibold rounded-tr-none shadow-sm' : 'bg-slate-50 border border-slate-200 text-slate-800 rounded-tl-none shadow-sm'
+                          }`}>
+                          {msg.text.split('\n').map((para, k) => <p key={k} className={k > 0 ? "mt-2" : ""}>{para}</p>)}
+
+                          {msg.isClassificationPrompt && (
+                            <div className="mt-4 p-3 bg-white border border-[#1A3A6B]/30 rounded-xl shadow-sm">
+                              <p className="text-[9px] text-slate-500 mb-3 font-bold uppercase tracking-wider">Confirm incident type to proceed:</p>
+                              <div className="flex gap-2">
+                                <button onClick={() => confirmClassification(msg.categorySuggested)} className="bg-[#1A3A6B] hover:bg-[#12284C] text-white px-3 py-2 rounded-lg text-[10px] font-bold shadow-sm transition-colors">Yes, Let's Proceed</button>
+                                <button onClick={() => {
+                                  setChatStage('intro');
+                                  setChatHistory(prev => [...prev, { role: "user", text: "Restarting... I want to clarify my statement." }]);
+                                }} className="bg-slate-100 border border-slate-200 px-3 py-2 text-slate-700 rounded-lg text-[10px] font-bold hover:bg-slate-200 transition-colors">Restart Chat</button>
+                              </div>
+                            </div>
+                          )}
+
+                          {msg.isCompletedPrompt && (
+                            <div className="mt-4">
+                              <button onClick={() => setCurrentScreen('rights')} className="w-full bg-[#1A3A6B] hover:bg-[#12284C] text-white px-3 py-2.5 rounded-xl text-[10px] font-bold shadow-sm flex justify-center items-center gap-1.5 transition-colors">
+                                Generate Formal FIR Draft <Icon name="arrowRight" className="w-3.5 h-3.5 text-white" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {isTyping && <div className="p-4 bg-slate-50 rounded-2xl self-start text-slate-400 text-xs italic flex items-center gap-2 border border-slate-100 shadow-sm z-10"><div className="w-1.5 h-1.5 rounded-full bg-slate-300 animate-bounce"></div><div className="w-1.5 h-1.5 rounded-full bg-slate-300 animate-bounce delay-75"></div><div className="w-1.5 h-1.5 rounded-full bg-slate-300 animate-bounce delay-150"></div> Parsing context...</div>}
+                  </div>
+
+                  {showWarning && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-b-xl flex gap-2.5 text-xs text-red-800 shadow-sm">
+                      <Icon name="alertTriangle" className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                      <div>
+                        <h5 className="font-bold text-slate-800 uppercase tracking-wider">{text.warningTitle}</h5>
+                        <p>{text.warningAadhaar}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-4 flex gap-3 relative">
+                    <button onClick={() => { setIsVoiceRecording(true); setTimeout(() => { setIsVoiceRecording(false); setUserInput("I was robbed near Sakinaka metro yesterday night."); }, 2000); }} className="p-3.5 bg-white border border-slate-200 text-slate-500 rounded-xl hover:text-[#1A3A6B] hover:bg-slate-50 shadow-sm transition-all">
+                      <Icon name={isVoiceRecording ? "pause" : "mic"} className={`w-5 h-5 ${isVoiceRecording ? 'text-red-500 animate-pulse' : ''}`} />
+                    </button>
+                    <input type="text" value={userInput} onChange={(e) => setUserInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitChat()} placeholder={isVoiceRecording ? "Listening..." : text.enterMessage} className="w-full bg-white border border-slate-300 rounded-xl p-3 text-xs focus:outline-[#1A3A6B] focus:ring-2 ring-[#1A3A6B]/20 shadow-sm transition-all" />
+                    <button onClick={submitChat} className="bg-[#1A3A6B] hover:bg-[#12284C] text-white px-6 py-3 rounded-xl text-xs font-bold uppercase shadow-sm transition-all">{text.send}</button>
+                  </div>
+
+                  <button onClick={() => setCurrentScreen('dashboard')} className="text-xs text-slate-400 hover:text-slate-600 flex items-center justify-center gap-1 mt-5 mb-2 transition-colors">
+                    <Icon name="arrowLeft" className="w-4 h-4" /> Return to Dashboard
+                  </button>
+                </div>
+
+                {/* Right Column: Real-Time FIR Readiness Dashboard */}
+                <div className="lg:col-span-4 flex flex-col gap-4">
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
+                    <h4 className="text-xs font-black text-slate-800 border-b border-slate-100 pb-3 mb-5 flex items-center gap-2 uppercase tracking-wider">
+                      <Icon name="checkCircle" className="w-4.5 h-4.5 text-[#1A3A6B]" />
+                      FIR Readiness Score
+                    </h4>
+
+                    <div className="flex items-center justify-center mb-6 relative">
+                      <svg className="w-28 h-28 transform -rotate-90">
+                        <circle cx="56" cy="56" r="46" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
+                        <circle cx="56" cy="56" r="46" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray="289" strokeDashoffset={289 - (289 * getCompleteness()) / 100} className="text-[#1A3A6B] transition-all duration-1000 ease-out" />
+                      </svg>
+                      <div className="absolute flex flex-col items-center justify-center">
+                        <span className="text-3xl font-black text-slate-800">{getCompleteness()}%</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50/50">
+                        <span className="text-slate-700 font-bold">Complainant Profile</span>
+                        {(userProfile.name && userProfile.name !== "Anonymous Citizen") ? <Icon name="check" className="w-4.5 h-4.5 text-emerald-500" /> : <Icon name="alertTriangle" className="w-4.5 h-4.5 text-amber-500" />}
+                      </div>
+                      <div className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50/50">
+                        <span className="text-slate-700 font-bold">Incident Date & Time</span>
+                        {(answers.incidentDate && !answers.incidentDate.includes("T")) ? <Icon name="check" className="w-4.5 h-4.5 text-emerald-500" /> : <Icon name="alertTriangle" className="w-4.5 h-4.5 text-amber-500" />}
+                      </div>
+                      <div className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50/50">
+                        <span className="text-slate-700 font-bold">Place of Occurrence</span>
+                        {(answers.incidentLocation && answers.incidentLocation !== "Sakinaka metro junction, Mumbai") ? <Icon name="check" className="w-4.5 h-4.5 text-emerald-500" /> : <Icon name="alertTriangle" className="w-4.5 h-4.5 text-amber-500" />}
+                      </div>
+                      <div className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50/50">
+                        <span className="text-slate-700 font-bold">Detailed Statement</span>
+                        {(answers.incidentDesc && answers.incidentDesc.length >= 15) ? <Icon name="check" className="w-4.5 h-4.5 text-emerald-500" /> : <Icon name="alertTriangle" className="w-4.5 h-4.5 text-amber-500" />}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
+                    <h4 className="text-[10px] font-black text-slate-800 pb-2 mb-3 border-b border-slate-100 uppercase tracking-wider flex items-center gap-1.5">
+                      <Icon name="alertTriangle" className="w-3.5 h-3.5 text-amber-500" /> Detected Missing Info
+                    </h4>
+                    {getMissingFields().length === 0 ? (
+                      <p className="text-xs text-emerald-600 font-bold flex items-center gap-1.5 bg-emerald-50 p-2.5 rounded-lg border border-emerald-100"><Icon name="check" className="w-4 h-4" /> All critical fields successfully logged.</p>
+                    ) : (
+                      <ul className="flex flex-col gap-2.5">
+                        {getMissingFields().map((f, idx) => (
+                          <li key={idx} className="text-[10px] text-slate-700 flex items-start gap-2 p-2 bg-amber-50/60 rounded border border-amber-100/60 shadow-sm">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 mt-1"></span>
+                            <span>Please mention the <strong>{f}</strong> in your statement.</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* 7. RIGHTS EXPLAINER SCREEN */}
+            {currentScreen === 'rights' && (
+              <div className="max-w-3xl mx-auto text-center">
+                <div className="w-12 h-12 rounded-2xl bg-[#E8EEF5] flex items-center justify-center mx-auto mb-4 border border-[#1A3A6B]/20">
+                  <Icon name="scale" className="w-6 h-6 text-[#1A3A6B]" />
+                </div>
+                <h2 className="text-xl font-black text-slate-800 mb-1">{text.legalRightsTitle}</h2>
+                <p className="text-xs text-slate-500 mb-6 max-w-xl mx-auto">{text.rightsSub}</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left mb-8">
+                  <div className="bg-white p-5 rounded-2xl border-l-4 border-[#1A3A6B] shadow-sm">
+                    <h4 className="text-xs font-black text-[#1A3A6B] uppercase mb-1">1. Free physical copy right</h4>
+                    <p className="text-xs text-slate-500">Under Section 154(2) of CrPC, police are legally bound to supply you a certified complete copy of the registered FIR immediately for free.</p>
+                  </div>
+                  <div className="bg-white p-5 rounded-2xl border-l-4 border-[#1A3A6B] shadow-sm">
+                    <h4 className="text-xs font-black text-[#1A3A6B] uppercase mb-1">2. Zero FIR registration right</h4>
+                    <p className="text-xs text-slate-500">You can lodge an FIR at ANY precinct regardless of boundary jurisdiction. They must transfer it internally later.</p>
+                  </div>
+                </div>
+
+                <button onClick={() => setCurrentScreen('preview')} className="bg-[#1A3A6B] hover:bg-[#12284C] text-white px-8 py-3.5 rounded-xl text-xs font-bold uppercase shadow flex items-center gap-1.5 mx-auto">
+                  {text.proceedToDraft} <Icon name="arrowRight" className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            )}
+
+            {/* 8. FIR DRAFT PREVIEW & BILINGUAL TOGGLES */}
+            {currentScreen === 'preview' && (
+              <div className="max-w-4xl mx-auto">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                  <div>
+                    <h2 className="text-xl font-black text-slate-800">{text.firDraftTitle}</h2>
+                    <p className="text-xs text-slate-500 mt-1">{text.firDraftSub}</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => setCurrentScreen('questions')} className="px-3.5 py-2 rounded-lg bg-slate-100 border border-slate-350 text-slate-700 text-xs font-bold">Edit Answers</button>
+                    <button onClick={exportPDF} className="bg-[#1A3A6B] hover:bg-[#12284C] text-white px-5 py-2 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm">
+                      <Icon name="download" className="w-4 h-4 text-white" /> {text.downloadPdf}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bilingual View toggles */}
+                <div className="flex border-b border-slate-200 mb-4">
+                  <button onClick={() => setDraftLangTab('en')} className={`px-4 py-2 text-xs font-black uppercase border-b-2 ${draftLangTab === 'en' ? 'border-[#1A3A6B] text-[#1A3A6B]' : 'border-transparent text-slate-500'}`}>English version</button>
+                  <button onClick={() => setDraftLangTab('hi')} className={`px-4 py-2 text-xs font-black uppercase border-b-2 ${draftLangTab === 'hi' ? 'border-[#1A3A6B] text-[#1A3A6B]' : 'border-transparent text-slate-500'}`}>Hindi version (हिंदी)</button>
+                </div>
+
+                {/* Official Draft preview box */}
+                <div className="bg-white text-slate-900 p-8 rounded-3xl shadow-md border-8 border-slate-200 font-mono text-xs leading-relaxed max-h-[500px] overflow-y-auto custom-scrollbar relative select-text">
+                  <div className="absolute inset-0 flex items-center justify-center select-none pointer-events-none opacity-[0.03] transform -rotate-45">
+                    <span className="text-[40px] font-black text-[#1A3A6B]">SMART FIR PORTAL DRAFT</span>
+                  </div>
+
+                  <div className="flex h-1.5 w-full mb-6">
+                    <div className="flex-1 bg-[#D97706]"></div>
+                    <div className="flex-1 bg-white"></div>
+                    <div className="flex-1 bg-[#16A34A]"></div>
+                  </div>
+
+                  {(() => {
+                    const trans = TRANSLATED_COMPLAINT[draftLangTab] || TRANSLATED_COMPLAINT['en'];
+                    const legal = getLegalSections(classifiedCategory);
+
+                    return (
+                      <div>
+                        <div className="text-center mb-6 border-b border-slate-300 pb-4">
+                          <h3 className="text-sm font-bold tracking-tight text-[#1A3A6B] uppercase">{trans.headerTitle}</h3>
+                          <p className="text-[10px] mt-1 font-bold text-slate-500">{trans.headerSub}</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <p>{trans.state}</p>
+                            <p>{trans.district}</p>
+                            <p>{trans.station}</p>
+                          </div>
+                          <div>
+                            <p>{trans.refNo}{Date.now().toString().slice(-4)}</p>
+                            <p><strong>{trans.severity}</strong> {severity}</p>
+                          </div>
+                        </div>
+
+                        <div className="border-t border-dashed border-slate-300 my-3"></div>
+
+                        {/* Complainant Ident */}
+                        <div className="mb-4">
+                          <p className="font-bold uppercase mb-1 text-[#1A3A6B]">{trans.section2}</p>
+                          <p>&bull; <strong>{trans.name}</strong> {answers.complainantName || userProfile.name}</p>
+                          <p>&bull; <strong>{trans.phone}</strong> {answers.complainantPhone || userProfile.phone || 'N/A'}</p>
+                          <p>&bull; <strong>{trans.city}</strong> {answers.complainantAddress || userProfile.city}</p>
+                        </div>
+
+                        <div className="border-t border-dashed border-slate-300 my-3"></div>
+
+                        {/* Occurrence Timeline */}
+                        <div className="mb-4">
+                          <p className="font-bold uppercase mb-1 text-[#1A3A6B]">{trans.section3}</p>
+                          <p>&bull; <strong>{trans.incidentDate}</strong> {answers.incidentDate.replace('T', ' ')}</p>
+                          <p>&bull; <strong>{trans.incidentLoc}</strong> {answers.incidentLocation}</p>
+                        </div>
+
+                        <div className="border-t border-dashed border-slate-300 my-3"></div>
+
+                        {/* Statement Description */}
+                        <div className="mb-4">
+                          <p className="font-bold uppercase mb-1 text-[#1A3A6B]">{trans.section4}</p>
+                          <p className="bg-slate-50 p-3 rounded border border-slate-200 italic whitespace-pre-wrap leading-relaxed text-slate-700">
+                            {answers.incidentDesc || "Citizen reported incident details of " + classifiedCategory}
+                          </p>
+                        </div>
+
+                        {/* Codification */}
+                        <div className="mb-4">
+                          <p className="font-bold uppercase mb-1 text-[#1A3A6B]">{trans.section6}</p>
+                          <p>&bull; <strong>{trans.bnsCode}</strong> {legal.bns}</p>
+                          <p>&bull; <strong>{trans.ipcCode}</strong> {legal.ipc}</p>
+                          <p className="text-[10px] text-slate-500 mt-1 italic">{trans.note} {legal.desc}</p>
+                        </div>
+
+                        {/* Evidence */}
+                        <div className="mb-4">
+                          <p className="font-bold uppercase mb-1 text-[#1A3A6B]">{trans.section7}</p>
+                          {evidenceFiles.map((file, idx) => (
+                            <p key={idx} className="text-slate-600">&bull; {trans.fileLabel} {idx + 1}: {file.name} ({file.size})</p>
+                          ))}
+                        </div>
+
+                        <div className="border-t-2 border-slate-800 pt-4 flex justify-between items-center text-[10px] mt-6">
+                          <div>
+                            <p className="font-bold text-[#1A3A6B]">Smart FIR Verification Seal</p>
+                          </div>
+                          <div className="border-t border-slate-600 px-4 pt-1 font-bold">
+                            {trans.signatureComplainant}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 leading-normal flex gap-3 shadow-sm">
+                  <Icon name="info" className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                  <p>{text.firDisclaimer}</p>
+                </div>
+
+                <div className="mt-6 flex justify-center gap-3">
+                  <button onClick={() => setCurrentScreen('dashboard')} className="px-5 py-2.5 rounded-lg bg-slate-100 border border-slate-300 text-slate-600 text-xs font-bold">Cancel</button>
+                  <button onClick={exportPDF} className="bg-[#1A3A6B] hover:bg-[#12284C] text-white px-6 py-2.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow">
+                    <Icon name="download" className="w-4.5 h-4.5 text-white" /> Download Complaint PDF
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 9. PDF SUCCESS SCREEN */}
+            {currentScreen === 'pdfsuccess' && (
+              <div className="max-w-md mx-auto text-center">
+                <div className="w-16 h-16 rounded-full bg-emerald-50 border-2 border-emerald-500 flex items-center justify-center mx-auto mb-6 shadow-sm">
+                  <Icon name="checkCircle" className="w-9 h-9 text-emerald-600" />
+                </div>
+                <h2 className="text-2xl font-black text-slate-800 mb-1">{text.pdfReady}</h2>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto mb-6">Your official legal draft complaint was generated and downloaded successfully. Present this copy to any precinct.</p>
+                <button onClick={() => setCurrentScreen('dashboard')} className="w-full bg-[#1A3A6B] text-white py-3 rounded-xl text-xs font-bold uppercase shadow">Return to Portal Home</button>
+              </div>
+            )}
+
+            {/* 10. EVIDENCE LOCKER SCENE */}
+            {currentScreen === 'locker' && (
+              <div className="max-w-4xl mx-auto">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h2 className="text-xl font-black text-slate-800">{text.lockerTitle}</h2>
+                    <p className="text-xs text-slate-500 mt-1">{text.lockerSub}</p>
+                  </div>
+                  <span className="text-[9px] text-[#1A3A6B] font-bold px-3 py-1 rounded bg-[#E8EEF5] border border-[#1A3A6B]/20">VAULT SECURITY ON</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="col-span-1 bg-white p-6 rounded-3xl border border-slate-200 text-center flex flex-col items-center justify-center min-h-[180px] shadow-sm">
+                    <Icon name="upload" className="w-8 h-8 text-[#1A3A6B]/40 mb-2 animate-bounce" />
+                    <h4 className="text-xs font-bold text-slate-700">Select file to secure</h4>
+                    <label className="bg-[#1A3A6B] text-white px-4 py-2 rounded-lg text-xs font-bold cursor-pointer mt-4 shadow">
+                      Choose File
+                      <input type="file" onChange={handleFileUpload} className="hidden" />
+                    </label>
+                  </div>
+
+                  <div className="col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-5 border-b border-slate-100 pb-3">{text.lockerTimeline}</h3>
+                    <div className="flex flex-col gap-3">
+                      {evidenceFiles.map(file => (
+                        <div key={file.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs">
+                          <div>
+                            <p className="font-bold text-slate-700">{file.name}</p>
+                            <p className="text-[9px] text-slate-400 font-mono">Size: {file.size} &bull; {file.category}</p>
+                          </div>
+                          <span className="text-[9px] text-emerald-700 font-bold">SECURED</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <button onClick={() => setCurrentScreen('dashboard')} className="mt-8 bg-[#1A3A6B] text-white px-6 py-2.5 rounded-xl text-xs font-bold mx-auto block shadow">Return to Portal Home</button>
+              </div>
+            )}
+
+            {/* 11. PRECINCT LOCATOR FULL SCENE */}
+            {currentScreen === 'locator' && (
+              <div className="max-w-5xl mx-auto">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h2 className="text-xl font-black text-slate-800">{text.locatorTitle}</h2>
+                    <p className="text-xs text-slate-500 mt-1">{text.locatorSub}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-12 gap-6 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                  <div className="col-span-12 lg:col-span-7 rounded-xl overflow-hidden min-h-[300px]">
+                    <iframe
+                      title="Precinct Full Map"
+                      width="100%"
+                      height="300"
+                      frameBorder="0"
+                      style={{ border: 0, borderRadius: '12px' }}
+                      src={`https://www.google.com/maps/embed/v1/place?key=${googleMapsKey || 'AIzaSyDummyKeyForStaticFallback'}&q=Sakinaka+Police+Station,Mumbai+Maharashtra&zoom=14`}
+                      allowFullScreen
+                      className="w-full h-full"
+                    />
+                  </div>
+
+                  <div className="col-span-12 lg:col-span-5 flex flex-col gap-3">
+                    {POLICE_STATIONS.map((ps) => (
+                      <div key={ps.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs flex justify-between items-center">
+                        <div>
+                          <p className="font-bold text-slate-800">{ps.name}</p>
+                          <p className="text-[9px] text-slate-400 font-mono mt-0.5">{ps.address}</p>
+                          <p className="text-[9px] text-[#1A3A6B] mt-1">Distance: {ps.distance} &bull; Hotline: {ps.contact}</p>
+                        </div>
+                        <Icon name="phone" className="w-4 h-4 text-[#1A3A6B] cursor-pointer" onClick={() => alert("Calling Hotline: " + ps.contact)} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <button onClick={() => setCurrentScreen('dashboard')} className="mt-8 bg-[#1A3A6B] text-white px-6 py-2.5 rounded-xl text-xs font-bold mx-auto block shadow">Return to Portal Home</button>
+              </div>
+            )}
+
+            {/* 12. SOS PANIC EMERGENCY MODES */}
+            {currentScreen === 'sos' && (
+              <div className="max-w-3xl mx-auto animate-siren rounded-3xl p-8 md:p-12 border-4 border-red-600 relative overflow-hidden shadow-2xl">
+                <div className="text-center">
+                  <div className="w-20 h-20 rounded-full bg-red-100 animate-pulse-red border-4 border-red-600 flex items-center justify-center mx-auto mb-6 shadow">
+                    <Icon name="alertTriangle" className="w-10 h-10 text-red-600 animate-bounce" />
+                  </div>
+                  <h2 className="text-2xl font-black text-red-700 mb-1 uppercase tracking-wider">{text.emergencyHeader}</h2>
+                  <p className="text-xs text-red-800 font-bold max-w-lg mx-auto leading-relaxed mb-8">{text.emergencySub}</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 relative z-10 text-left">
+                  <div className="bg-white p-5 rounded-2xl border border-red-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <h4 className="text-xs font-black text-red-800 uppercase tracking-wider mb-3">IMMEDIATE SAFETY DIRECTIVES</h4>
+                      <ul className="flex flex-col gap-2.5 text-xs text-slate-700 font-bold">
+                        <li className="p-2 bg-red-50/50 border border-red-100 rounded-lg">{text.reachSafety}</li>
+                        <li className="p-2 bg-red-50/50 border border-red-100 rounded-lg">STEP 2: Share Live GPS coordinates with dispatch units.</li>
+                        <li className="p-2 bg-red-50/50 border border-red-100 rounded-lg">STEP 3: Toggle the local siren alarm below.</li>
+                      </ul>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                      <span className="text-[9px] text-slate-500 font-bold">{text.sirenSimulation}</span>
+                      <button onClick={triggerAudioSiren} className={`px-4 py-2 rounded-xl text-xs font-black uppercase shadow transition-all ${isPlayingSiren ? 'bg-red-600 text-white animate-pulse' : 'bg-slate-150 border border-slate-350 text-slate-700'
+                        }`}>
+                        {isPlayingSiren ? text.sirenPlaying : text.sirenToggle}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <button onClick={() => alert("Calling Emergency Police Room: 100")} className="w-full p-4 bg-red-700 hover:bg-red-800 text-white font-bold text-xs rounded-2xl shadow flex items-center justify-between">
+                      <span className="flex items-center gap-2"><Icon name="phone" className="w-4 h-4 animate-bounce text-white" /> {text.call100}</span>
+                    </button>
+                    <button onClick={() => alert("Calling All emergency services: 112")} className="w-full p-4 bg-white hover:bg-slate-50 border border-red-300 text-red-700 font-bold text-xs rounded-2xl shadow flex items-center justify-between">
+                      <span className="flex items-center gap-2"><Icon name="phone" className="w-4 h-4 text-red-700" /> {text.call112}</span>
+                    </button>
+                    <button onClick={() => alert("Calling Women Safety Helpline: 1091")} className="w-full p-4 bg-white hover:bg-slate-50 border border-red-300 text-red-700 font-bold text-xs rounded-2xl shadow flex items-center justify-between">
+                      <span className="flex items-center gap-2"><Icon name="heart" className="w-4 h-4 text-red-700" /> {text.call1091}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-center relative z-10">
+                  <button
+                    onClick={() => { if (isPlayingSiren) triggerAudioSiren(); setCurrentScreen('dashboard'); }}
+                    className="px-6 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-600 text-xs font-bold shadow-sm"
+                  >
+                    {text.cancelEmergency}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 13. INTERACTIVE STEP-BY-STEP WIZARD SCREEN */}
+            {currentScreen === 'stepwizard' && (
+              <div className="max-w-4xl mx-auto pb-10">
+
+                {/* Phase A: Incident Category Selector */}
+                {wizardCategory === null ? (
+                  <div className="text-center mt-6">
+                    <h2 className="text-2xl font-black text-[#1A3A6B] font-montserrat">
+                      {language === 'en' ? 'Step-by-Step FIR Filing Guidance System' : language === 'hi' ? 'चरण-दर-चरण FIR शिकायत मार्गदर्शन प्रणाली' : 'संरचित FIR तक्रार मार्गदर्शन प्रणाली'}
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-2 max-w-xl mx-auto leading-relaxed">
+                      {language === 'en'
+                        ? 'Select your incident category to launch tailored safety guidelines, customized evidence checklists, required document lists, and automated complaint drafts.'
+                        : language === 'hi'
+                          ? 'अपनी घटना श्रेणी चुनें ताकि विशेष सुरक्षा दिशानिर्देश, साक्ष्य लॉग, आवश्यक दस्तावेजों की सूची और स्वचालित मसौदा तैयार किया जा सके।'
+                          : 'विशेष सुरक्षा मार्गदर्शक सूचना, पुरावे सूची आणि तक्रार मसुदा सुरू करण्यासाठी आपल्या घटनेचा प्रकार निवडा.'}
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-8 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                      {[
+                        { id: 'Theft / Robbery', titleEn: 'Theft / Robbery', titleHi: 'चोरी / डकैती', titleMr: 'चोरी / दरोडा', descEn: 'Stolen wallet, phone, vehicle or household burglary', descHi: 'मोबाइल, वाहन, नकदी या घर की चोरी', descMr: 'मोबाईल, दागिने, वाहन किंवा घरफोडी', icon: 'lock', color: 'bg-blue-50 text-blue-800 border-blue-100' },
+                        { id: 'Cybercrime / Fraud', titleEn: 'Cybercrime / Fraud', titleHi: 'साइबर अपराध / धोखाधड़ी', titleMr: 'सायबर गुन्हेगारी / फसवणूक', descEn: 'UPI scam, phishing, hacked profiles, financial fraud', descHi: 'ऑनलाइन धोखाधड़ी, यूपीआई घोटाला, प्रोफाइल हैकिंग', descMr: 'ऑनलाईन आर्थिक फसवणूक, यूपीआय स्कॅम, सोशल मीडिया हॅक', icon: 'layers', color: 'bg-purple-50 text-purple-800 border-purple-100' },
+                        { id: 'Harassment / Stalking', titleEn: 'Harassment / Stalking', titleHi: 'उत्पीड़न / पीछा करना', titleMr: 'छळवणूक / पाठलाग करणे', descEn: 'Threatening calls, physical stalking, modesty insults', descHi: 'धमकी भरे फोन, पीछा करना, अभद्र टिप्पणी', descMr: 'धमकीचे फोन, पाठलाग करणे, विनयभंग', icon: 'heart', color: 'bg-rose-50 text-rose-800 border-rose-100' },
+                        { id: 'Accident / Road Incident', titleEn: 'Accident / Road Incident', titleHi: 'दुर्घटना / सड़क दुर्घटना', titleMr: 'अपघात / रस्ता दुर्घटना', descEn: 'Vehicle collision, hit and run, rash driving events', descHi: 'वाहन टक्कर, हिट एंड रन, लापरवाही से गाड़ी चलाना', descMr: 'वाहन धडक, हिट अँड रन, निष्काळजी वाहन चालवणे', icon: 'alertTriangle', color: 'bg-amber-50 text-amber-800 border-amber-100' },
+                        { id: 'Assault / Violence', titleEn: 'Assault / Violence', titleHi: 'हमला / शारीरिक हिंसा', titleMr: 'हल्ला / शारीरिक हिंसा', descEn: 'Physical abuse, threats, neighborhood fights, assault', descHi: 'हाथापाई, मारपीट, शारीरिक हमला या धमकी', descMr: 'मारामारी, शारीरिक हल्ला किंवा गंभीर धमक्या', icon: 'shield', color: 'bg-red-50 text-red-800 border-red-100' }
+                      ].map((cat) => (
+                        <div
+                          key={cat.id}
+                          onClick={() => {
+                            setWizardCategory(cat.id);
+                            setClassifiedCategory(cat.id);
+                            const details = getLegalSections(cat.id);
+                            setSeverity(details.severity);
+                            setWizardStep(1);
+                            setWizardEvidenceChecked({});
+                            setWizardDocsChecked({});
+                            setWizardForm({
+                              incidentDate: new Date().toISOString().slice(0, 16),
+                              incidentLocation: '',
+                              incidentDesc: '',
+                              witnessName: '',
+                              accusedDesc: ''
+                            });
+                          }}
+                          className="p-5 rounded-2xl border border-slate-200 hover:border-[#1A3A6B] bg-slate-50 hover:bg-[#E8EEF5] text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-44 group shadow-sm"
+                        >
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${cat.color} group-hover:scale-105 transition-transform`}>
+                            <Icon name={cat.icon} className="w-5 h-5" />
+                          </div>
+                          <div className="mt-4">
+                            <h4 className="text-xs font-black text-slate-800 font-montserrat uppercase group-hover:text-[#1A3A6B]">
+                              {language === 'en' ? cat.titleEn : language === 'hi' ? cat.titleHi : cat.titleMr}
+                            </h4>
+                            <p className="text-[10px] text-slate-450 mt-1 leading-normal">
+                              {language === 'en' ? cat.descEn : language === 'hi' ? cat.descHi : cat.descMr}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button onClick={() => setCurrentScreen('dashboard')} className="mt-8 text-xs font-bold text-slate-500 hover:text-slate-700 flex items-center gap-1 mx-auto bg-white border border-slate-250 px-4 py-2 rounded-xl shadow-sm transition-all duration-200">
+                      <Icon name="arrowLeft" className="w-4 h-4" /> {language === 'en' ? 'Return to Dashboard' : language === 'hi' ? 'डैशबोर्ड पर लौटें' : 'डॅशबोर्डवर परत जा'}
+                    </button>
+                  </div>
+                ) : (
+
+                  // Phase B: The 7-Step Interactive Wizard Frame
+                  <div className="mt-4">
+                    {/* Stepper Card Top Header */}
+                    <div className="bg-white border border-slate-200 p-5 rounded-3xl mb-6 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] bg-[#E8EEF5] text-[#1A3A6B] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                            {language === 'en' ? 'FIR Guidance Wizard' : language === 'hi' ? 'FIR मार्गदर्शन विज़ार्ड' : 'FIR मार्गदर्शन विझार्ड'}
+                          </span>
+                          <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                            {wizardCategory}
+                          </span>
+                        </div>
+                        <h3 className="text-base font-black text-slate-800 font-montserrat mt-1.5 uppercase leading-none">
+                          {language === 'en' ? '7-Step Guided Framework' : language === 'hi' ? '7-चरण कानूनी गाइड प्रणाली' : '७-पायऱ्यांची कायदेशीर विझार्ड'}
+                        </h3>
+                      </div>
+                      <button
+                        onClick={() => setWizardCategory(null)}
+                        className="px-3.5 py-1.5 border border-slate-250 hover:bg-slate-50 text-slate-650 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
+                      >
+                        <Icon name="refresh" className="w-3.5 h-3.5" />
+                        {language === 'en' ? 'Change Category' : language === 'hi' ? 'श्रेणी बदलें' : 'श्रेणी बदला'}
+                      </button>
+                    </div>
+
+                    {/* Visual Stepper Indicator Bar */}
+                    <div className="bg-white border border-slate-200 p-5 rounded-3xl mb-6 shadow-sm overflow-x-auto custom-scrollbar">
+                      <div className="flex items-center justify-between min-w-[720px] px-2">
+                        {[1, 2, 3, 4, 5, 6, 7].map((num) => {
+                          const stepsLabel = {
+                            en: ["Stay Safe", "Evidence", "Incident Details", "Required Docs", "Filing Process", "FIR Draft", "Police Maps"],
+                            hi: ["सुरक्षित रहें", "साक्ष्य", "घटना विवरण", "आवश्यक दस्तावेज", "पंजीकरण प्रक्रिया", "FIR ड्राफ्ट", "पुलिस स्टेशन"],
+                            mr: ["सुरक्षित राहा", "पुरावे", "घटना तपशील", "आवश्यक कागदपत्रे", "दाखल प्रक्रिया", "तक्रार मसुदा", "पोलीस नकाशा"]
+                          };
+                          const labels = stepsLabel[language] || stepsLabel['en'];
+                          const isCurrent = wizardStep === num;
+                          const isCompleted = wizardStep > num;
+
+                          return (
+                            <React.Fragment key={num}>
+                              <div
+                                onClick={() => setWizardStep(num)}
+                                className="flex flex-col items-center cursor-pointer group flex-1"
+                              >
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${isCurrent
+                                    ? 'bg-[#1A3A6B] text-white shadow ring-4 ring-blue-100 scale-105'
+                                    : isCompleted
+                                      ? 'bg-emerald-600 text-white'
+                                      : 'bg-slate-100 border border-slate-205 text-slate-400 hover:bg-slate-200 hover:text-slate-700'
+                                  }`}>
+                                  {isCompleted ? <Icon name="check" className="w-4 h-4 text-white" /> : num}
+                                </div>
+                                <span className={`text-[9px] mt-2 font-bold uppercase whitespace-nowrap tracking-tight transition-all ${isCurrent ? 'text-[#1A3A6B]' : isCompleted ? 'text-emerald-700' : 'text-slate-400 group-hover:text-slate-600'
+                                  }`}>
+                                  {labels[num - 1]}
+                                </span>
+                              </div>
+                              {num < 7 && (
+                                <div className={`h-0.5 flex-1 mx-2 transition-all ${wizardStep > num ? 'bg-emerald-650' : 'bg-slate-200'
+                                  }`} />
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Mobile Step Header (High Accessibility) */}
+                    <div className="lg:hidden text-center bg-[#F3F4F6] border border-slate-200 px-4 py-2.5 rounded-2xl mb-4 text-xs font-black text-[#1A3A6B] font-mono">
+                      {language === 'en' ? `STEP ${wizardStep} OF 7` : language === 'hi' ? `चरण ${wizardStep} (7 में से)` : `पायरी ${wizardStep} (७ पैकी)`}
+                    </div>
+
+                    {/* Step Content Container Card */}
+                    <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm mb-6 relative">
+
+                      {/* Audio TTS guide button */}
+                      <div className="absolute top-4 right-4 z-10">
+                        <button
+                          onClick={() => {
+                            let speakTextStr = "";
+                            if (wizardStep === 1) {
+                              speakTextStr = language === 'en'
+                                ? `Step 1: Stay Safe. Please review immediate safety instructions tailored to ${wizardCategory}.`
+                                : `चरण 1: सुरक्षित रहें। कृपया ${wizardCategory} के लिए तत्काल सुरक्षा निर्देशों की समीक्षा करें।`;
+                            } else if (wizardStep === 2) {
+                              speakTextStr = language === 'en'
+                                ? "Step 2: Collect evidence. Check the checkboxes for evidence items you have gathered."
+                                : "चरण 2: साक्ष्य एकत्र करें। आपके द्वारा एकत्रित किए गए साक्ष्यों को चिह्नित करें।";
+                            } else if (wizardStep === 3) {
+                              speakTextStr = language === 'en'
+                                ? "Step 3: Record incident details. Provide date, location, witnesses and chronological statement."
+                                : "चरण 3: घटना का विवरण दर्ज करें। तारीख, स्थान, गवाह और शिकायत विवरण प्रदान करें।";
+                            } else if (wizardStep === 4) {
+                              speakTextStr = language === 'en'
+                                ? "Step 4: Required documents. Check dynamic documentation needs before visiting."
+                                : "चरण 4: आवश्यक दस्तावेज। पुलिस स्टेशन जाने से पहले आवश्यक दस्तावेजों को चिह्नित करें।";
+                            } else if (wizardStep === 5) {
+                              speakTextStr = language === 'en'
+                                ? "Step 5: Filing process and precautions. Know where to file and review legal precautions."
+                                : "चरण 5: शिकायत प्रक्रिया और सावधानियां। जानें कि शिकायत कहां दर्ज करें और कानूनी सावधानियों की समीक्षा करें।";
+                            } else if (wizardStep === 6) {
+                              speakTextStr = language === 'en'
+                                ? "Step 6: Formal complaint draft. Preview and download the generated PDF docket."
+                                : "चरण 6: शिकायत का मसौदा। उत्पन्न शिकायत पत्र का पूर्वावलोकन करें और पीडीएफ डाउनलोड करें।";
+                            } else if (wizardStep === 7) {
+                              speakTextStr = language === 'en'
+                                ? "Step 7: Locate nearest police station. Use the interactive maps to navigate."
+                                : "चरण 7: नजदीकी पुलिस स्टेशन खोजें। नेविगेट करने के लिए मानचित्र का उपयोग करें।";
+                            }
+                            speakText(speakTextStr);
+                          }}
+                          className="p-2 bg-slate-50 border border-slate-200 text-slate-500 rounded-lg hover:text-[#1A3A6B]"
+                          title="Hear Audio Guide"
+                        >
+                          <Icon name="volume2" className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* STEP 1: STAY SAFE */}
+                      {wizardStep === 1 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-4 text-red-750 font-montserrat">
+                            <Icon name="alertTriangle" className="w-5 h-5 text-red-600 animate-bounce" />
+                            <h4 className="text-base font-black uppercase tracking-tight">
+                              {language === 'en' ? 'STEP 1 — Immediate Safety Directives' : language === 'hi' ? 'चरण 1 — तत्काल सुरक्षा निर्देश' : 'पायरी १ — तातडीच्या सुरक्षा सूचना'}
+                            </h4>
+                          </div>
+
+                          <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                            {language === 'en'
+                              ? 'Your personal safety is our primary concern. Please carefully implement these safety guidelines tailored to your current incident category before taking legal steps:'
+                              : language === 'hi'
+                                ? 'आपकी व्यक्तिगत सुरक्षा हमारी सर्वोच्च प्राथमिकता है। कानूनी कदम उठाने से पहले इन निर्देशों का पालन करें:'
+                                : 'आपली वैयक्तिक सुरक्षा ही सर्वात महत्त्वाची कायदेशीर प्राथमिकता आहे. कोणतेही पाऊल उचलण्यापूर्वी खालील सूचना वाचा:'}
+                          </p>
+
+                          <div className="bg-red-50/50 border border-red-200 rounded-2xl p-5 flex flex-col gap-4 mb-6">
+                            {(WIZARD_DATA[language]?.safety[wizardCategory] || WIZARD_DATA['en']?.safety[wizardCategory] || []).map((instr, idx) => (
+                              <div key={idx} className="flex gap-3 text-xs text-red-950 leading-relaxed font-bold">
+                                <div className="w-5 h-5 rounded-full bg-red-100 border border-red-200 flex items-center justify-center shrink-0 text-red-800 text-[10px] font-mono font-black">
+                                  {idx + 1}
+                                </div>
+                                <p className="pt-0.5">{instr}</p>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-wrap justify-between items-center gap-3">
+                            <div className="text-left">
+                              <span className="text-[10px] text-slate-500 font-bold block">
+                                {language === 'en' ? 'Need immediate physical dispatch of police patrol?' : 'क्या आपको तत्काल पुलिस गश्ती दल की सहायता चाहिए?'}
+                              </span>
+                              <span className="text-[9px] text-slate-400 font-medium">
+                                {language === 'en' ? 'Emergency response lines remain active 24/7' : 'आपातकालीन सहायता लाइनें हमेशा सक्रिय हैं'}
+                              </span>
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => alert("Calling Emergency Control: 100")} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black shadow flex items-center gap-1.5 transition-all">
+                                <Icon name="phone" className="w-3.5 h-3.5 text-white" /> {language === 'en' ? 'Call 100' : 'कॉल करें 100'}
+                              </button>
+                              <button onClick={() => alert("Calling Response Unit: 112")} className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all">
+                                {language === 'en' ? 'Call 112' : 'कॉल करें 112'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* STEP 2: EVIDENCE CHECKLIST */}
+                      {wizardStep === 2 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-4 text-[#1A3A6B] font-montserrat">
+                            <Icon name="lock" className="w-5 h-5 text-[#1A3A6B]" />
+                            <h4 className="text-base font-black uppercase tracking-tight">
+                              {language === 'en' ? 'STEP 2 — Collect Incident Evidence' : language === 'hi' ? 'चरण 2 — घटना के साक्ष्य एकत्र करें' : 'पायरी २ — पुरावे गोळा करा'}
+                            </h4>
+                          </div>
+
+                          <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                            {language === 'en'
+                              ? 'Checking off available evidence strengthens your legal draft and indices proof envelopes. Check the boxes below for items you have gathered:'
+                              : language === 'hi'
+                                ? 'उपलब्ध साक्ष्यों को चिह्नित करने से एक मजबूत मामला बनता है। आपके पास जो साक्ष्य हैं उन्हें नीचे चिह्नित करें:'
+                                : 'उपलब्ध पुरावे चिन्हांकित केल्याने कायदेशीर बाजू मजबूत होते. आपल्याकडे असलेले पुरावे खाली तपासा:'}
+                          </p>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                            {(WIZARD_DATA[language]?.evidence[wizardCategory] || WIZARD_DATA['en']?.evidence[wizardCategory] || []).map((item, idx) => {
+                              const isChecked = !!wizardEvidenceChecked[item];
+                              return (
+                                <div
+                                  key={idx}
+                                  onClick={() => setWizardEvidenceChecked(prev => ({ ...prev, [item]: !isChecked }))}
+                                  className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex justify-between items-center ${isChecked
+                                      ? 'border-emerald-500 bg-emerald-50/50 text-emerald-950 font-black shadow-sm'
+                                      : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium'
+                                    }`}
+                                >
+                                  <span className="text-xs leading-normal">{item}</span>
+                                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isChecked ? 'border-emerald-600 bg-emerald-600 text-white animate-pulse' : 'border-slate-300 bg-white'
+                                    }`}>
+                                    {isChecked && <Icon name="check" className="w-3.5 h-3.5 text-white" />}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div className="p-4 bg-[#E8EEF5] border border-[#1A3A6B]/20 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-3">
+                            <div className="text-left">
+                              <h5 className="text-xs font-black text-[#1A3A6B] uppercase tracking-wide">{language === 'en' ? 'Evidence Vault Upload' : 'साक्ष्य तिजोरी अपलोड'}</h5>
+                              <p className="text-[10px] text-slate-500 mt-0.5">{language === 'en' ? 'Store digital proofs in our double-encrypted citizen storage Locker.' : 'डिजिटल साक्ष्य लॉकर में सुरक्षित करें।'}</p>
+                            </div>
+                            <label className="bg-[#1A3A6B] hover:bg-[#12284C] text-white px-5 py-2.5 rounded-xl text-xs font-bold cursor-pointer shrink-0 shadow transition-all duration-150">
+                              {language === 'en' ? 'Secure New File' : 'नया साक्ष्य अपलोड करें'}
+                              <input type="file" onChange={handleFileUpload} className="hidden" />
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* STEP 3: PREPARE INCIDENT DETAILS */}
+                      {wizardStep === 3 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-4 text-[#1A3A6B] font-montserrat">
+                            <Icon name="fileText" className="w-5 h-5 text-[#1A3A6B]" />
+                            <h4 className="text-base font-black uppercase tracking-tight">
+                              {language === 'en' ? 'STEP 3 — Record Incident Parameters' : language === 'hi' ? 'चरण 3 — घटना का विवरण दर्ज करें' : 'पायरी ३ — घटनेचा तपशील भरा'}
+                            </h4>
+                          </div>
+
+                          <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                            {language === 'en'
+                              ? 'Fill in exact timelines and location points. These fields directly populate and synchronize with your formal bilingual complaint draft.'
+                              : language === 'hi'
+                                ? 'सटीक समय और स्थान विवरण भरें। ये विवरण आपके एफआईआर मसौदे में स्वचालित रूप से दर्ज हो जाएंगे।'
+                                : 'अचूक वेळ आणि ठिकाण तपशील भरा. हे आपल्या अंतिम तक्रार मसुद्यात दिसून येईल.'}
+                          </p>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                                {language === 'en' ? 'Incident Date & Time' : 'घटना की तारीख और समय'}
+                              </label>
+                              <input
+                                type="datetime-local"
+                                value={wizardForm.incidentDate}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setWizardForm(prev => ({ ...prev, incidentDate: val }));
+                                  setAnswers(prev => ({ ...prev, incidentDate: val }));
+                                }}
+                                className="w-full bg-white border border-slate-350 rounded-xl p-3 text-xs focus:outline-[#1A3A6B]"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                                {language === 'en' ? 'Exact Place of Occurrence' : 'घटना का सटीक स्थान'}
+                              </label>
+                              <input
+                                type="text"
+                                value={wizardForm.incidentLocation}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setWizardForm(prev => ({ ...prev, incidentLocation: val }));
+                                  setAnswers(prev => ({ ...prev, incidentLocation: val }));
+                                }}
+                                placeholder="e.g., Near Sakinaka metro gate 2, Andheri East"
+                                className="w-full bg-white border border-slate-355 rounded-xl p-3 text-xs focus:outline-[#1A3A6B]"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                                {language === 'en' ? 'Witnesses Present (Names & Contact)' : 'प्रत्यक्षदर्शी / गवाह विवरण'}
+                              </label>
+                              <input
+                                type="text"
+                                value={wizardForm.witnessName}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setWizardForm(prev => ({ ...prev, witnessName: val }));
+                                  setAnswers(prev => ({ ...prev, witnessName: val }));
+                                }}
+                                placeholder="e.g., Shopkeeper Mr. Suresh (+91 9900998877) or 'None'"
+                                className="w-full bg-white border border-slate-355 rounded-xl p-3 text-xs focus:outline-[#1A3A6B]"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                                {language === 'en' ? 'Suspect Description / Vehicle Plate' : 'संदिग्ध आरोपी का विवरण'}
+                              </label>
+                              <input
+                                type="text"
+                                value={wizardForm.accusedDesc}
+                                onChange={(e) => {
+                                  setWizardForm(prev => ({ ...prev, accusedDesc: e.target.value }));
+                                }}
+                                placeholder="e.g., Tall man wearing helmet, driving grey scooter MH-02-AB-1234"
+                                className="w-full bg-white border border-slate-355 rounded-xl p-3 text-xs focus:outline-[#1A3A6B]"
+                              />
+                            </div>
+
+                            <div className="sm:col-span-2">
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                                {language === 'en' ? 'Detailed Statement (Describe Chronologically)' : 'शिकायत विवरण (घटना का सरल क्रमबद्ध वर्णन)'} <span className="text-red-500 font-bold">*</span>
+                              </label>
+                              <textarea
+                                value={wizardForm.incidentDesc}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setWizardForm(prev => ({ ...prev, incidentDesc: val }));
+                                  setAnswers(prev => ({ ...prev, incidentDesc: val }));
+                                }}
+                                rows="4"
+                                placeholder={language === 'en' ? 'State what happened step-by-step. Avoid legal jargon...' : 'घटना का सरल शब्दों में वर्णन करें...'}
+                                className="w-full bg-white border border-slate-350 rounded-xl p-3 text-xs focus:outline-[#1A3A6B] leading-relaxed"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* STEP 4: REQUIRED DOCUMENTS */}
+                      {wizardStep === 4 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-4 text-[#1A3A6B] font-montserrat">
+                            <Icon name="layers" className="w-5 h-5 text-[#1A3A6B]" />
+                            <h4 className="text-base font-black uppercase tracking-tight">
+                              {language === 'en' ? 'STEP 4 — Required Document Checklist' : language === 'hi' ? 'चरण 4 — आवश्यक दस्तावेज चेकलिस्ट' : 'पायरी ४ — आवश्यक कागदपत्रे यादी'}
+                            </h4>
+                          </div>
+
+                          <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                            {language === 'en'
+                              ? 'Ensure you carry these required documents dynamically compiled based on your incident type when visiting the Police Precinct:'
+                              : language === 'hi'
+                                ? 'पुलिस स्टेशन जाते समय अपने साथ घटना के अनुसार संकलित निम्नलिखित आवश्यक दस्तावेज अवश्य ले जाएं:'
+                                : 'पोलीस ठाण्यात जाताना खालील आवश्यक कागदपत्रे सोबत असल्याचे तपासा:'}
+                          </p>
+
+                          <div className="flex flex-col gap-3 mb-6">
+                            {(WIZARD_DATA[language]?.documents[wizardCategory] || WIZARD_DATA['en']?.documents[wizardCategory] || []).map((doc, idx) => {
+                              const isChecked = !!wizardDocsChecked[doc];
+                              return (
+                                <div
+                                  key={idx}
+                                  onClick={() => setWizardDocsChecked(prev => ({ ...prev, [doc]: !isChecked }))}
+                                  className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex justify-between items-center ${isChecked
+                                      ? 'border-emerald-500 bg-emerald-50/50 text-emerald-950 font-black shadow-sm'
+                                      : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium'
+                                    }`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-500 font-mono font-black shrink-0">
+                                      {idx + 1}
+                                    </div>
+                                    <span className="text-xs leading-normal">{doc}</span>
+                                  </div>
+                                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isChecked ? 'border-emerald-600 bg-emerald-600 text-white animate-pulse' : 'border-slate-300 bg-white'
+                                    }`}>
+                                    {isChecked && <Icon name="check" className="w-3.5 h-3.5 text-white" />}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* STEP 5: OFFICIAL FILING PROCESS & PRECAUTIONS */}
+                      {wizardStep === 5 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-4 text-[#1A3A6B] font-montserrat">
+                            <Icon name="scale" className="w-5 h-5 text-[#1A3A6B]" />
+                            <h4 className="text-base font-black uppercase tracking-tight">
+                              {language === 'en' ? 'STEP 5 — Filing Protocol & Precautions' : language === 'hi' ? 'चरण 5 — शिकायत दर्ज करने की प्रक्रिया और सावधानियां' : 'पायरी ५ — दाखल प्रक्रिया आणि खबरदारी'}
+                            </h4>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-6">
+                            <div className="md:col-span-6 flex flex-col gap-4">
+                              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                                <h5 className="text-xs font-black text-[#1A3A6B] uppercase mb-1.5">{language === 'en' ? 'Where to Lodge FIR' : 'एफआईआर कहां दर्ज करें?'}</h5>
+                                <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                                  {WIZARD_DATA[language]?.process?.where || WIZARD_DATA['en']?.process?.where}
+                                </p>
+                              </div>
+                              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                                <h5 className="text-xs font-black text-[#1A3A6B] uppercase mb-1.5">{language === 'en' ? 'What to Say to Desk Officer' : 'पुलिस अधिकारी से क्या कहें?'}</h5>
+                                <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                                  {WIZARD_DATA[language]?.process?.say || WIZARD_DATA['en']?.process?.say}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="md:col-span-6 bg-amber-50 border-2 border-[#D97706] rounded-3xl p-5 shadow-sm">
+                              <h5 className="text-xs font-black text-[#D97706] uppercase tracking-wider mb-4 flex items-center gap-1.5 font-montserrat">
+                                <Icon name="alertTriangle" className="w-4 h-4 text-[#D97706]" />
+                                {language === 'en' ? 'Important Precautions' : 'महत्वपूर्ण सावधानियां'}
+                              </h5>
+                              <ul className="flex flex-col gap-3.5">
+                                {(WIZARD_DATA[language]?.process?.precautions || WIZARD_DATA['en']?.process?.precautions || []).map((item, idx) => (
+                                  <li key={idx} className="flex gap-2.5 text-xs text-amber-950 leading-relaxed font-black">
+                                    <Icon name="checkCircle" className="w-4 h-4 text-[#D97706] shrink-0 mt-0.5" />
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* STEP 6: GENERATE FIR DRAFT */}
+                      {wizardStep === 6 && (
+                        <div>
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 text-[#1A3A6B] font-montserrat">
+                            <div className="flex items-center gap-2">
+                              <Icon name="fileText" className="w-5 h-5 text-[#1A3A6B]" />
+                              <h4 className="text-base font-black uppercase tracking-tight">
+                                {language === 'en' ? 'STEP 6 — Formal Complaint Draft' : language === 'hi' ? 'चरण 6 — औपचारिक शिकायत का मसौदा' : 'पायरी ६ — तक्रार मसुदा'}
+                              </h4>
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <button
+                                onClick={() => {
+                                  const complainantName = userProfile.name;
+                                  const complainantPhone = userProfile.phone || "+91-XXXXXXXXXX";
+                                  const complainantAddress = userProfile.city || "Mumbai, MH";
+                                  const repId = "rep_" + Date.now();
+
+                                  dbService.saveFIRReport(repId, {
+                                    userId: currentUser.uid,
+                                    incidentType: wizardCategory,
+                                    incidentDate: wizardForm.incidentDate,
+                                    location: wizardForm.incidentLocation,
+                                    firDraft: {
+                                      complainantName,
+                                      complainantPhone,
+                                      complainantAddress,
+                                      incidentDate: wizardForm.incidentDate,
+                                      incidentLocation: wizardForm.incidentLocation,
+                                      witnessName: wizardForm.witnessName || 'None',
+                                      incidentDesc: wizardForm.incidentDesc || 'Citizen statement'
+                                    }
+                                  }).then(() => {
+                                    alert(language === 'en' ? 'Complaint summary successfully secured in Firestore Profile.' : 'शिकायत विवरण सफलतापूर्वक सहेजा गया।');
+                                    setWizardStep(7);
+                                  });
+                                }}
+                                className="px-4 py-2 bg-[#10B981] hover:bg-[#059669] text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition-all duration-150"
+                              >
+                                <Icon name="checkCircle" className="w-4 h-4 text-white" />
+                                {language === 'en' ? 'Secure Draft' : 'मसौदा सहेजें'}
+                              </button>
+                              <button
+                                onClick={exportPDF}
+                                className="px-4 py-2 bg-[#1A3A6B] hover:bg-[#12284C] text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition-all duration-150"
+                              >
+                                <Icon name="download" className="w-4 h-4 text-white" />
+                                {language === 'en' ? 'Print PDF' : 'प्रिंट पीडीएफ'}
+                              </button>
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                            {language === 'en'
+                              ? 'Verify all information in the preview block. The legal codification (BNS 2023 / IPC 1860) is matched dynamically:'
+                              : language === 'hi'
+                                ? 'पूर्वावलोकन में सभी विवरणों की जांच करें। कानूनी धाराएं स्वचालित रूप से संकलित की गई हैं:'
+                                : 'खालील मसुद्याची खात्री करा. कायदेशीर कलमे समाविष्ट करण्यात आली आहेत:'}
+                          </p>
+
+                          {/* Dynamic Preview block */}
+                          <div className="bg-slate-50 border-2 border-slate-200 p-6 rounded-2xl font-mono text-[11px] leading-relaxed max-h-[300px] overflow-y-auto custom-scrollbar select-text text-slate-800 shadow-inner">
+                            <div className="text-center font-bold text-[#1A3A6B] uppercase mb-4 pb-2 border-b border-slate-300">
+                              {language === 'en' ? 'FORM I - COMPLAINT SUMMARIZATION DOCKET' : 'फॉर्म I - शिकायत सारांश (मार्गदर्शन मसौदा)'}
+                            </div>
+                            <p><strong>District Area:</strong> Sakinaka Precinct, Zone 10, Mumbai City</p>
+                            <p><strong>Incident Category:</strong> {wizardCategory}</p>
+                            <p><strong>Occurrence Timeline:</strong> {wizardForm.incidentDate.replace('T', ' ')}</p>
+                            <p><strong>Occurrence Location:</strong> {wizardForm.incidentLocation || 'Not specified'}</p>
+                            <p className="border-t border-dashed border-slate-300 my-2 pt-2"><strong>Complainant Name:</strong> {userProfile.name}</p>
+                            <p><strong>Contact phone:</strong> {userProfile.phone || 'N/A'}</p>
+                            <p><strong>Address:</strong> {userProfile.city || 'Mumbai'}</p>
+                            <p className="border-t border-dashed border-slate-300 my-2 pt-2"><strong>Statement Summary:</strong></p>
+                            <p className="bg-white p-3 border border-slate-200 rounded italic text-slate-700 whitespace-pre-wrap leading-relaxed">
+                              {wizardForm.incidentDesc || 'No detailed statement provided yet. Please go back to Step 3.'}
+                            </p>
+                            <p className="border-t border-dashed border-slate-300 my-2 pt-2"><strong>Applicable Legal Sections (Prima Facie):</strong></p>
+                            {(() => {
+                              const details = getLegalSections(wizardCategory);
+                              return (
+                                <div>
+                                  <p>&bull; <strong>BNS (2023):</strong> {details.bns}</p>
+                                  <p>&bull; <strong>IPC (1860):</strong> {details.ipc}</p>
+                                  <p>&bull; <strong>Assessed Severity:</strong> <span className="font-bold underline text-red-700">{details.severity}</span></p>
+                                  <p className="text-[10px] text-slate-500 italic mt-1 leading-normal">{details.desc}</p>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* STEP 7: FIND NEARBY POLICE STATION */}
+                      {wizardStep === 7 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-4 text-[#1A3A6B] font-montserrat">
+                            <Icon name="mapPin" className="w-5 h-5 text-[#1A3A6B]" />
+                            <h4 className="text-base font-black uppercase tracking-tight">
+                              {language === 'en' ? 'STEP 7 — Find Nearest Police Station' : language === 'hi' ? 'चरण 7 — नजदीकी पुलिस स्टेशन खोजें' : 'पायरी ७ — जवळचे पोलीस ठाणे शोधा'}
+                            </h4>
+                          </div>
+
+                          <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                            {language === 'en'
+                              ? 'Your guided preparation is complete! Present the downloaded PDF draft at the closest verified police station. Maps are embedded below:'
+                              : language === 'hi'
+                                ? 'आपका मार्गदर्शन पूर्ण हुआ! डाउनलोड किए गए पीडीएफ को नजदीकी पुलिस स्टेशन में प्रस्तुत करें। विवरण नीचे दिया गया है:'
+                                : 'आपली तयारी पूर्ण झाली आहे! मसुदा घेऊन जवळच्या पोलीस ठाण्याला भेट द्या:'}
+                          </p>
+
+                          <div className="grid grid-cols-1 md:grid-cols-12 gap-5 mb-6">
+                            <div className="md:col-span-7 h-52 bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 relative">
+                              <iframe
+                                title="Precinct Wizard Maps"
+                                width="100%"
+                                height="100%"
+                                frameBorder="0"
+                                style={{ border: 0 }}
+                                src={`https://www.google.com/maps/embed/v1/place?key=${googleMapsKey || 'AIzaSyDummyKeyForStaticFallback'}&q=Sakinaka+Police+Station,Mumbai+Maharashtra&zoom=14`}
+                                allowFullScreen
+                                className="absolute inset-0"
+                              />
+                            </div>
+
+                            <div className="md:col-span-5 flex flex-col gap-2.5">
+                              {POLICE_STATIONS.map((ps) => (
+                                <div key={ps.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] flex justify-between items-center font-medium">
+                                  <div>
+                                    <p className="font-bold text-slate-800">{ps.name}</p>
+                                    <p className="text-slate-400 font-mono mt-0.5">{ps.distance} &bull; {ps.contact}</p>
+                                  </div>
+                                  <button
+                                    onClick={() => alert(`Calling hotline: ${ps.contact}`)}
+                                    className="p-1.5 bg-[#E8EEF5] text-[#1A3A6B] rounded border border-[#1A3A6B]/10 hover:bg-[#1A3A6B] hover:text-white transition-all"
+                                  >
+                                    <Icon name="phone" className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Final disclaimer banner */}
+                          <div className="p-4 bg-amber-50 border border-amber-250 rounded-2xl text-xs text-amber-800 leading-normal flex gap-3 shadow-sm mb-6">
+                            <Icon name="info" className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                            <p>{text.firDisclaimer}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Navigation bottom buttons */}
+                      <div className="flex justify-between items-center pt-6 mt-6 border-t border-slate-100">
+                        <button
+                          onClick={() => {
+                            if (wizardStep > 1) {
+                              setWizardStep(prev => prev - 1);
+                            } else {
+                              setWizardCategory(null);
+                            }
+                          }}
+                          className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1 transition-all"
+                        >
+                          <Icon name="arrowLeft" className="w-3.5 h-3.5" />
+                          {language === 'en' ? 'Previous Step' : 'पिछला चरण'}
+                        </button>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              if (isPlayingSiren) triggerAudioSiren();
+                              setCurrentScreen('dashboard');
+                            }}
+                            className="px-4 py-2.5 text-slate-500 hover:text-slate-700 text-xs font-bold transition-all"
+                          >
+                            {language === 'en' ? 'Exit Wizard' : 'बाहर निकलें'}
+                          </button>
+
+                          {wizardStep < 7 ? (
+                            <button
+                              onClick={() => {
+                                // Simple validation for step 3 description
+                                if (wizardStep === 3 && !wizardForm.incidentDesc.trim()) {
+                                  alert(language === 'en' ? 'Please provide a simple incident description first.' : 'कृपया घटना का संक्षिप्त विवरण अवश्य दर्ज करें।');
+                                  return;
+                                }
+                                setWizardStep(prev => prev + 1);
+                              }}
+                              className="px-6 py-2.5 bg-[#1A3A6B] hover:bg-[#12284C] text-white text-xs font-bold rounded-xl flex items-center gap-1 shadow transition-all"
+                            >
+                              {language === 'en' ? 'Next Step' : 'अगला चरण'}
+                              <Icon name="chevronRight" className="w-3.5 h-3.5 text-white" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setCurrentScreen('dashboard');
+                              }}
+                              className="px-6 py-2.5 bg-[#1A3A6B] hover:bg-[#12284C] text-white text-xs font-bold rounded-xl flex items-center gap-1 shadow transition-all"
+                            >
+                              {language === 'en' ? 'Finish Guided Setup' : 'मार्गदर्शन समाप्त करें'}
+                              <Icon name="check" className="w-3.5 h-3.5 text-white" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            )}
+
+          </main>
+
+          {/* ----------------------------------------------------
+                OFFICIAL PORTAL FOOTER
+                ---------------------------------------------------- */}
+          <footer className="mt-20 text-center text-xs text-slate-400 font-mono max-w-xl mx-auto leading-relaxed border-t border-slate-200 pt-6 pb-12">
+            <p>&copy; 2026 Smart FIR Portal &bull; Safe Citizen Legal Initiative.</p>
+            <p className="mt-1 text-[9px] text-slate-400">All complaint drafts comply strictly with the Bharatiya Nyaya Sanhita (BNS), 2023 & IPC, 1860.</p>
+          </footer>
+
+        </div>
+      );
+    }
+
+    // Render root node
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+
+</html>
