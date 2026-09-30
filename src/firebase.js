@@ -19,7 +19,8 @@ import {
   query, 
   where, 
   orderBy,
-  serverTimestamp 
+  serverTimestamp,
+  deleteDoc
 } from "firebase/firestore";
 import { 
   getStorage, 
@@ -38,7 +39,15 @@ let realStorage = null;
 let isFirebaseActive = false;
 
 // Try loading configuration from environment or LocalStorage
-const savedConfig = localStorage.getItem("firebaseConfig");
+// REMOVE BEFORE PRODUCTION DEPLOYMENT: Hardcoded Firebase config for local testing
+const savedConfig = localStorage.getItem("firebaseConfig") || JSON.stringify({
+  apiKey: "AIzaSyBY-45Qrs2T0qxrvVGkGRJMfr6g37WwOPM",
+  authDomain: "smart-fir-app.firebaseapp.com",
+  projectId: "smart-fir-app",
+  storageBucket: "smart-fir-app.firebasestorage.app",
+  messagingSenderId: "811399646911",
+  appId: "1:811399646911:web:0c2c1651fd753943f7800a"
+});
 let firebaseConfig = null;
 
 if (savedConfig) {
@@ -279,6 +288,17 @@ export const dbService = {
       await mockDelay(200);
       const reports = getLocalCollection("mock_fir_reports");
       return reports.filter(r => r.userId === userId);
+    }
+  },
+
+  deleteFIRReport: async (reportId) => {
+    if (isFirebaseActive) {
+      await deleteDoc(doc(realDb, "fir_reports", reportId));
+    } else {
+      await mockDelay(100);
+      const reports = getLocalCollection("mock_fir_reports");
+      const filtered = reports.filter(r => r.reportId !== reportId);
+      setLocalCollection("mock_fir_reports", filtered);
     }
   },
 

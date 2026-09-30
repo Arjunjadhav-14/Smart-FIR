@@ -351,7 +351,7 @@ const EMERGENCY_TRIGGERS = [
 
 function App() {
   // Navigation & User
-  const [currentScreen, setCurrentScreen] = useState('splash'); // splash, auth, dashboard, chat, classification, questions, rights, preview, pdfsuccess, locker, locator, sos, drafts
+  const [currentScreen, setCurrentScreen] = useState('splash'); // splash, auth, dashboard, chat, stepwizard, classification, questions, rights, preview, pdfsuccess, locker, locator, sos, drafts
   const [language, setLanguage] = useState('en');
   const [currentUser, setCurrentUser] = useState(null);
   const [userProfile, setUserProfile] = useState({ name: '', phone: '', city: '', language: 'en' });
@@ -379,6 +379,13 @@ function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
   const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatHistory, isTyping]);
 
   // Incident & Guided Questions State
   const [classifiedCategory, setClassifiedCategory] = useState("Other");
@@ -429,17 +436,287 @@ function App() {
   // Saved Drafts state
   const [savedReports, setSavedReports] = useState([]);
   const [reportsLoading, setReportsLoading] = useState(false);
+  const [isApiConnected, setIsApiConnected] = useState(true);
+
+  // Step-by-Step 8-Step Wizard State
+  const [wizardCategory, setWizardCategory] = useState(null);
+  const [wizardStep, setWizardStep] = useState(1);
+  const [wizardEvidenceChecked, setWizardEvidenceChecked] = useState({});
+  const [wizardDocsChecked, setWizardDocsChecked] = useState({});
+  const [wizardForm, setWizardForm] = useState({
+    incidentDesc: '',
+    incidentDate: new Date().toISOString().slice(0, 16),
+    incidentLocation: '',
+    stolenItems: '',
+    estimatedValue: '',
+    transactionId: '',
+    platformName: '',
+    complainantName: '',
+    complainantPhone: '',
+    complainantAddress: '',
+    accusedDesc: '',
+    witnessName: ''
+  });
 
   // Draft Preview Tab (Bilingual)
   const [draftLangTab, setDraftLangTab] = useState('en'); // en, hi
 
-  // Developer Configuration Console state
-  const [showDevConsole, setShowDevConsole] = useState(false);
-  const [apiConfigInput, setApiConfigInput] = useState('');
-  const [googleMapsKey, setGoogleMapsKey] = useState('');
+  const [googleMapsKey, setGoogleMapsKey] = useState((import.meta.env && import.meta.env.VITE_GOOGLE_MAPS_KEY) || localStorage.getItem('google_maps_key') || 'AIzaSyAnH_-QDz_udVpG73gWJj1WMn4_l67Khto');
 
-  // GPS updates
+  // GPS updates & Live Location Tracking
   const [gpsCoords, setGpsCoords] = useState({ lat: 19.0968, lng: 72.8884 });
+  const [isLiveTracking, setIsLiveTracking] = useState(false);
+  const [liveCoords, setLiveCoords] = useState(null);
+  const [trackingError, setTrackingError] = useState('');
+  const [accuracyWarning, setAccuracyWarning] = useState('');
+  const [lastUpdatedTime, setLastUpdatedTime] = useState('');
+  const [accuracyMeters, setAccuracyMeters] = useState(0);
+  const [nearbyStations, setNearbyStations] = useState([]);
+  const [isSearchingPlaces, setIsSearchingPlaces] = useState(false);
+  const watchIdRef = useRef(null);
+  const mapContainerRef = useRef(null);
+  const userMarkerRef = useRef(null);
+  const accuracyCircleRef = useRef(null);
+  const stationsMarkersRef = useRef([]);
+  const hasSearchedPlacesRef = useRef(false);
+
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return (R * c).toFixed(1);
+  };
+
+  const sortedStations = React.useMemo(() => {
+    const stationsToDisplay = isLiveTracking ? nearbyStations : POLICE_STATIONS;
+    if (!liveCoords) return stationsToDisplay;
+    return [...stationsToDisplay].map(ps => ({
+      ...ps,
+      distance: calculateDistance(liveCoords.lat, liveCoords.lng, ps.lat, ps.lng) + " km"
+    })).sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
+  }, [liveCoords, nearbyStations, isLiveTracking]);
+
+  // Initialize map
+  useEffect(() => {
+    if (currentScreen === 'locator') {
+      if (!window.google) {
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsKey || ''}&libraries=places`;
+        script.async = true;
+        script.defer = true;
+        script.onload = () => initMap(false);
+        document.head.appendChild(script);
+      } else {
+        initMap(isLiveTracking);
+      }
+    }
+  }, [currentScreen]);
+
+  const initMap = (trackingActive) => {
+    if (!mapContainerRef.current || !window.google) return;
+    if (!window.map) {
+      window.map = new window.google.maps.Map(mapContainerRef.current, {
+        center: { lat: 19.0968, lng: 72.8884 },
+        zoom: 14,
+        disableDefaultUI: true,
+        zoomControl: true,
+      });
+    }
+    
+    stationsMarkersRef.current.forEach(m => m.setMap(null));
+    stationsMarkersRef.current = [];
+    
+    if (!trackingActive) {
+      POLICE_STATIONS.forEach(ps => {
+        const marker = new window.google.maps.Marker({
+          position: { lat: ps.lat, lng: ps.lng },
+          map: window.map,
+          title: ps.name,
+          icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
+        });
+        stationsMarkersRef.current.push(marker);
+      });
+    }
+  };
+
+  const updateUserMarker = (location) => {
+    if (!window.map || !window.google) return;
+    if (!userMarkerRef.current) {
+      userMarkerRef.current = new window.google.maps.Marker({
+        position: location,
+        map: window.map,
+        title: "You are here",
+        icon: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
+      });
+    } else {
+      userMarkerRef.current.setPosition(location);
+    }
+  };
+
+  const updateAccuracyCircle = (location, accuracy) => {
+    if (!window.map || !window.google) return;
+    if (!accuracyCircleRef.current) {
+      accuracyCircleRef.current = new window.google.maps.Circle({
+        strokeColor: "#2563EB",
+        strokeOpacity: 0.8,
+        strokeWeight: 2,
+        fillColor: "#3B82F6",
+        fillOpacity: 0.35,
+        map: window.map,
+        center: location,
+        radius: accuracy
+      });
+    } else {
+      accuracyCircleRef.current.setCenter(location);
+      accuracyCircleRef.current.setRadius(accuracy);
+    }
+  };
+
+  const searchNearbyStations = (location, radius = 10000) => {
+    if (!window.map || !window.google) return;
+    setIsSearchingPlaces(true);
+    console.log(`Nearby police station search started (Radius: ${radius}m)`);
+    
+    const service = new window.google.maps.places.PlacesService(window.map);
+    const request = {
+      location: location,
+      radius: radius,
+      keyword: 'police station',
+      type: 'police'
+    };
+
+    service.nearbySearch(request, (results, status) => {
+      console.log("Places API results received", status, results);
+      if (status === window.google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
+        
+        stationsMarkersRef.current.forEach(m => m.setMap(null));
+        stationsMarkersRef.current = [];
+        
+        const formattedStations = results.map((place, index) => {
+          const marker = new window.google.maps.Marker({
+            position: place.geometry.location,
+            map: window.map,
+            title: place.name,
+            icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
+          });
+          stationsMarkersRef.current.push(marker);
+          
+          return {
+            id: place.place_id || `live-${index}`,
+            name: place.name,
+            address: place.vicinity,
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+            type: 'Police Station',
+            contact: '100'
+          };
+        });
+        
+        setNearbyStations(formattedStations);
+        setIsSearchingPlaces(false);
+        console.log("Station cards updated");
+      } else if (radius === 10000) {
+        console.log("No stations found within 10km, increasing radius to 25km");
+        searchNearbyStations(location, 25000);
+      } else {
+        setIsSearchingPlaces(false);
+        setNearbyStations([]);
+      }
+    });
+  };
+
+  const startLiveTracking = () => {
+    if (!navigator.geolocation) {
+      setTrackingError("Geolocation is not supported by your browser.");
+      return;
+    }
+    setTrackingError('');
+    setIsLiveTracking(true);
+    hasSearchedPlacesRef.current = false;
+    initMap(true);
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const userLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        const accuracy = position.coords.accuracy;
+        console.log("User location detected:", userLocation);
+
+        setLiveCoords(userLocation);
+        setAccuracyMeters(accuracy);
+        setLastUpdatedTime(new Date().toLocaleTimeString());
+        setTrackingError('');
+
+        if (accuracy > 500) {
+          setAccuracyWarning("Your location accuracy is low. For exact location, use mobile GPS or enable device location services.");
+        } else {
+          setAccuracyWarning("");
+        }
+
+        updateUserMarker(userLocation);
+        updateAccuracyCircle(userLocation, accuracy);
+        if (window.map) window.map.setCenter(userLocation);
+
+        if (!hasSearchedPlacesRef.current) {
+          hasSearchedPlacesRef.current = true;
+          searchNearbyStations(userLocation);
+        }
+      },
+      (error) => {
+        console.error("Location error:", error);
+        setTrackingError("Unable to track location. Please try again.");
+        setIsLiveTracking(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 0
+      }
+    );
+  };
+
+  const stopLiveTracking = () => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setIsLiveTracking(false);
+    hasSearchedPlacesRef.current = false;
+    setNearbyStations([]);
+    setLiveCoords(null);
+    setTrackingError("Live location tracking stopped.");
+    setAccuracyWarning("");
+
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setMap(null);
+      userMarkerRef.current = null;
+    }
+    if (accuracyCircleRef.current) {
+      accuracyCircleRef.current.setMap(null);
+      accuracyCircleRef.current = null;
+    }
+    
+    initMap(false);
+    if (window.map) window.map.setCenter({ lat: 19.0968, lng: 72.8884 });
+  };
+
+  const refreshLocation = () => {
+    stopLiveTracking();
+    setTimeout(() => startLiveTracking(), 500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+    };
+  }, []);
 
   const text = LOCALIZATION[language] || LOCALIZATION['en'];
 
@@ -575,9 +852,32 @@ function App() {
   }, [currentScreen]);
 
   // ----------------------------------------------------
-  // BOT RESPONSE CLASSIFIER AGENT
+  // REAL-TIME NLP READINESS DASHBOARD UTILS
   // ----------------------------------------------------
-  const handleBotResponse = (userText) => {
+  const getCompleteness = () => {
+    let score = 0;
+    if (userProfile.name && userProfile.name !== "Anonymous Citizen") score += 20;
+    if (answers.incidentDate && !answers.incidentDate.includes("T")) score += 20;
+    else if (answers.incidentDate) score += 10;
+    if (answers.incidentLocation && answers.incidentLocation !== "Sakinaka metro junction, Mumbai") score += 20;
+    if (answers.incidentDesc && answers.incidentDesc.length >= 15) score += 30;
+    if (answers.witnessName || answers.accusedDesc) score += 10;
+    return score > 100 ? 100 : score;
+  };
+
+  const getMissingFields = () => {
+    const missing = [];
+    if (!userProfile.name || userProfile.name === "Anonymous Citizen") missing.push(language === 'en' ? "Complainant Name" : language === 'hi' ? "शिकायतकर्ता का नाम" : "तक्रारदाराचे नाव");
+    if (!answers.incidentDate || answers.incidentDate.includes("T")) missing.push(language === 'en' ? "Exact Date/Time" : language === 'hi' ? "सटीक तिथि/समय" : "अचूक वेळ");
+    if (!answers.incidentLocation || answers.incidentLocation === "Sakinaka metro junction, Mumbai") missing.push(language === 'en' ? "Place of Occurrence" : language === 'hi' ? "घटना का स्थान" : "घटनेचे ठिकाण");
+    if (!answers.incidentDesc || answers.incidentDesc.length < 15) missing.push(language === 'en' ? "Detailed Statement" : language === 'hi' ? "विस्तृत विवरण" : "तपशीलवार माहिती");
+    return missing;
+  };
+
+  // ----------------------------------------------------
+  // BOT RESPONSE CLASSIFIER AGENT (Firebase Cloud Function + Offline Fallback)
+  // ----------------------------------------------------
+  const handleBotResponse = (userText, currentHistory) => {
     setIsTyping(true);
     
     // Check for SOS triggers
@@ -612,52 +912,231 @@ function App() {
       return;
     }
 
-    setTimeout(() => {
-      setIsTyping(false);
-      
-      let category = "Other";
-      if (userText.toLowerCase().includes("stolen") || userText.toLowerCase().includes("theft") || userText.toLowerCase().includes("robbed") || userText.toLowerCase().includes("chori") || userText.toLowerCase().includes("wallet")) {
-        category = "Theft / Robbery";
-      } else if (userText.toLowerCase().includes("cyber") || userText.toLowerCase().includes("hacked") || userText.toLowerCase().includes("scam") || userText.toLowerCase().includes("money lost") || userText.toLowerCase().includes("fake call")) {
-        category = "Cybercrime / Fraud";
-      } else if (userText.toLowerCase().includes("assault") || userText.toLowerCase().includes("beat") || userText.toLowerCase().includes("slap") || userText.toLowerCase().includes("fight") || userText.toLowerCase().includes("violence")) {
-        category = "Assault / Violence";
-      } else if (userText.toLowerCase().includes("harass") || userText.toLowerCase().includes("stalk") || userText.toLowerCase().includes("eve") || userText.toLowerCase().includes("followed")) {
-        category = "Harassment / Stalking";
-      } else if (userText.toLowerCase().includes("wife") || userText.toLowerCase().includes("domestic") || userText.toLowerCase().includes("husband") || userText.toLowerCase().includes("abuse")) {
-        category = "Domestic Violence";
+    // Make secure Cloud Function call
+    const chatFunctionUrl = localStorage.getItem('chat_function_url') || 'https://us-central1-smart-fir-app.cloudfunctions.net/chat';
+    const openAIApiKey = localStorage.getItem('openai_key') || 'AIzaSyDkNQQ7MVP-AcbC_bpjHmx6eseRCcg1aQw';
+    const messagesToSend = currentHistory;
+
+    const handleBotCall = async () => {
+      const headers = {
+        "Content-Type": "application/json"
+      };
+      if (openAIApiKey) {
+        headers["Authorization"] = `Bearer ${openAIApiKey}`;
       }
 
-      setClassifiedCategory(category);
-      const legalDetails = getLegalSections(category);
-      setSeverity(legalDetails.severity);
-      
-      setAnswers(prev => ({ ...prev, incidentDesc: userText }));
+      try {
+        const res = await fetch(chatFunctionUrl, {
+          method: "POST",
+          headers: headers,
+          body: JSON.stringify({ 
+            messages: messagesToSend,
+            apiKey: openAIApiKey
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          return data.reply;
+        }
+        console.warn("Cloud Function response not OK, attempting direct API fallback...");
+      } catch (e) {
+        console.warn("Cloud Function connection failed, attempting direct API fallback...", e);
+      }
 
-      let replyText = "";
-      if (language === 'hi') {
-        replyText = `आपके विवरण के आधार पर, यह मामला "${category}" के अंतर्गत वर्गीकृत होता है।\n\nप्राथमिक कानूनी धाराएं: ${legalDetails.bns} (BNS)\nसंभावित गंभीरता स्तर: ${legalDetails.severity}।\n\nक्या हम इस वर्गीकरण की पुष्टि करें और आपके शिकायत का ड्राफ्ट तैयार करने के लिए आगे बढ़ें?`;
-      } else if (language === 'mr') {
-        replyText = `आपल्या वर्णनावरून, हे प्रकरण "${category}" श्रेणी अंतर्गत वर्गीकृत केले आहे.\n\nप्राथमिक कायदेशीर कलमे: ${legalDetails.bns} (BNS)\nगांभीर्य पातळी: ${legalDetails.severity}।\n\nआम्ही पुढे जावे का?`;
+      // 2. Direct Client-side API Fallback (so index.html can run standalone!)
+      if (!openAIApiKey) throw new Error("No API Key configured");
+
+      const isGemini = openAIApiKey.startsWith('AIzaSy');
+      const systemPrompt = `You are Smart FIR AI Assistant, a helpful legal guidance chatbot for Indian citizens. Reply only in the selected language. Ask one question at a time. Guide users through FIR filing. Do not claim FIR is officially filed. Do not ask for Aadhaar, OTP, passwords, or bank PIN.
+
+Your role is to help users understand the FIR filing process in simple language.
+
+In addition to your conversational response, when you believe you have gathered enough information to construct an FIR draft (or when the user explicitly requests to generate the draft), output a JSON block at the very end of your response inside a markdown code block labeled \`\`\`json-fir-draft ... \`\`\` containing the collected details structured as:
+{
+  "isReady": true,
+  "category": "Theft / Robbery" | "Cybercrime / Fraud" | "Assault / Violence" | "Harassment / Stalking" | "Domestic Violence" | "Other",
+  "date": "YYYY-MM-DDTHH:MM",
+  "location": "Incident location details",
+  "description": "A comprehensive summary of what happened, as described by the user",
+  "complainantName": "Citizen's Name (if collected)",
+  "complainantPhone": "Citizen's Phone (if collected)",
+  "evidence": "Recommended evidence items"
+}`;
+
+      if (isGemini) {
+        const alternateMessages = [];
+        messagesToSend.forEach(msg => {
+          const role = msg.role === 'user' ? 'user' : 'model';
+          const cleanText = msg.text.replace(/```json-fir-draft[\s\S]*?```/g, '').trim();
+          if (!cleanText) return;
+
+          if (alternateMessages.length > 0 && alternateMessages[alternateMessages.length - 1].role === role) {
+            alternateMessages[alternateMessages.length - 1].parts[0].text += '\n' + cleanText;
+          } else {
+            alternateMessages.push({
+              role: role,
+              parts: [{ text: cleanText }]
+            });
+          }
+        });
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${openAIApiKey}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [{ text: systemPrompt }]
+            },
+            contents: alternateMessages,
+            generationConfig: {
+              temperature: 0.7
+            }
+          })
+        });
+
+        if (!response.ok) throw new Error("Direct Gemini call failed");
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text;
+
       } else {
-        replyText = `Based on your statement description, this is categorized under "${category}".\n\nPrima Facie Codification: ${legalDetails.bns} (BNS)\nAssessed Severity Matrix: ${legalDetails.severity}.\n\nShould we confirm this category and proceed with the guided questionnaire to prepare your formal draft?`;
+        const openAiMessages = [
+          { role: 'system', content: systemPrompt },
+          ...messagesToSend.map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'assistant',
+            content: msg.text.replace(/```json-fir-draft[\s\S]*?```/g, '').trim()
+          }))
+        ];
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${openAIApiKey}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: openAiMessages,
+            temperature: 0.7
+          })
+        });
+
+        if (!response.ok) throw new Error("Direct OpenAI call failed");
+        const data = await response.json();
+        return data.choices[0].message.content;
+      }
+    };
+
+    handleBotCall()
+    .then(reply => {
+      setIsTyping(false);
+      setIsApiConnected(true); // AI successfully connected
+      console.log("Smart FIR AI Assistant: Backend response received successfully.");
+      
+      const replyStr = reply || "";
+
+      // Parse JSON block for FIR Draft in the reply if it exists
+      const jsonMatch = replyStr.match(/```json-fir-draft([\s\S]*?)```/);
+      let draftData = null;
+      let cleanReply = replyStr;
+
+      if (jsonMatch) {
+        try {
+          draftData = JSON.parse(jsonMatch[1].trim());
+          cleanReply = replyStr.replace(jsonMatch[0], "").trim();
+        } catch (e) {
+          console.error("Error parsing AI-generated FIR JSON draft:", e);
+        }
       }
 
       setChatHistory(prev => [
         ...prev,
-        { role: "assistant", text: replyText, isClassificationPrompt: true, categorySuggested: category }
+        { 
+          role: "assistant", 
+          text: cleanReply,
+          draftData: draftData
+        }
       ]);
-    }, 1200);
+
+      if (draftData) {
+        // Auto-configure the answers state using details collected by the AI!
+        setAnswers(prev => ({
+          ...prev,
+          complainantName: draftData.complainantName || prev.complainantName,
+          complainantPhone: draftData.complainantPhone || prev.complainantPhone,
+          incidentLocation: draftData.location || prev.incidentLocation,
+          incidentDate: draftData.date || prev.incidentDate,
+          incidentDesc: draftData.description || prev.incidentDesc
+        }));
+        
+        if (draftData.category) {
+          let safeCategory = "Other";
+          const cat = draftData.category || "";
+          if (cat.toLowerCase().includes("theft") || cat.toLowerCase().includes("rob")) safeCategory = "Theft / Robbery";
+          else if (cat.toLowerCase().includes("cyber") || cat.toLowerCase().includes("fraud")) safeCategory = "Cybercrime / Fraud";
+          else if (cat.toLowerCase().includes("assault") || cat.toLowerCase().includes("violen")) safeCategory = "Assault / Violence";
+          else if (cat.toLowerCase().includes("harass") || cat.toLowerCase().includes("stalk")) safeCategory = "Harassment / Stalking";
+          else if (cat.toLowerCase().includes("accident")) safeCategory = "Accident / Road Incident";
+          
+          setClassifiedCategory(safeCategory);
+          const legalDetails = getLegalSections(safeCategory);
+          setSeverity(legalDetails.severity);
+        }
+      }
+    })
+    .catch(err => {
+      console.error("Smart FIR AI Assistant: API connection failed or encountered error during execution:", err);
+      setIsApiConnected(false); // API call failed, switch status to "Basic Guidance Mode"
+
+      // OFFLINE REGEX FALLBACK ENGINE
+      setTimeout(() => {
+        setIsTyping(false);
+        
+        // 2. Safe Fallback Response
+        let fallbackReply = "AI service is temporarily unavailable. I can still guide you with basic FIR steps. Please describe the incident.";
+        if (language === 'hi') {
+          fallbackReply = "एआई सेवा अस्थायी रूप से अनुपलब्ध है। मैं अभी भी बुनियादी प्राथमिकी (FIR) चरणों में आपका मार्गदर्शन कर सकता हूँ। कृपया घटना का वर्णन करें।";
+        } else if (language === 'mr') {
+          fallbackReply = "एआय सेवा तात्पुरती अनुपलब्ध आहे. मी तरीही तुम्हाला मूलभूत एफआयआर (FIR) चरणांमध्ये मदत करू शकतो. कृपया घटनेचे वर्णन करा।";
+        }
+
+        let category = "Other";
+        if (userText.toLowerCase().includes("stolen") || userText.toLowerCase().includes("theft") || userText.toLowerCase().includes("robbed") || userText.toLowerCase().includes("chori") || userText.toLowerCase().includes("wallet")) {
+          category = "Theft / Robbery";
+        } else if (userText.toLowerCase().includes("cyber") || userText.toLowerCase().includes("hacked") || userText.toLowerCase().includes("scam") || userText.toLowerCase().includes("money lost") || userText.toLowerCase().includes("fake call")) {
+          category = "Cybercrime / Fraud";
+        } else if (userText.toLowerCase().includes("assault") || userText.toLowerCase().includes("beat") || userText.toLowerCase().includes("slap") || userText.toLowerCase().includes("fight") || userText.toLowerCase().includes("violence")) {
+          category = "Assault / Violence";
+        } else if (userText.toLowerCase().includes("harass") || userText.toLowerCase().includes("stalk") || userText.toLowerCase().includes("eve") || userText.toLowerCase().includes("followed")) {
+          category = "Harassment / Stalking";
+        } else if (userText.toLowerCase().includes("wife") || userText.toLowerCase().includes("domestic") || userText.toLowerCase().includes("husband") || userText.toLowerCase().includes("abuse")) {
+          category = "Domestic Violence";
+        }
+
+        setClassifiedCategory(category);
+        const legalDetails = getLegalSections(category);
+        setSeverity(legalDetails.severity);
+        
+        setAnswers(prev => ({ ...prev, incidentDesc: (prev.incidentDesc + " " + userText).trim() }));
+
+        setChatHistory(prev => [
+          ...prev,
+          { role: "assistant", text: fallbackReply }
+        ]);
+      }, 1000);
+    });
   };
 
   const submitChatMessage = (customText = null) => {
     const textToSend = customText || userInput;
     if (!textToSend.trim()) return;
 
-    setChatHistory(prev => [...prev, { role: "user", text: textToSend }]);
+    const newHistory = [...chatHistory, { role: "user", text: textToSend }];
+    setChatHistory(newHistory);
     if (!customText) setUserInput('');
 
-    handleBotResponse(textToSend);
+    handleBotResponse(textToSend, newHistory);
   };
 
   const confirmAIClassification = (selectedCat) => {
@@ -996,18 +1475,7 @@ function App() {
     }, 2500);
   };
 
-  // Settings: Apply dynamice config key
-  const saveDeveloperConfig = () => {
-    if (apiConfigInput) {
-      localStorage.setItem("firebaseConfig", apiConfigInput);
-      alert("Firebase live config saved. App will now reload in LIVE database mode!");
-      window.location.reload();
-    } else {
-      localStorage.removeItem("firebaseConfig");
-      alert("Developer config cleared. Reloading in local mock database mode.");
-      window.location.reload();
-    }
-  };
+
 
   if (authLoading) {
     return (
@@ -1067,14 +1535,7 @@ function App() {
               ))}
             </div>
 
-            {/* Dev Console Trigger */}
-            <button 
-              onClick={() => setShowDevConsole(!showDevConsole)}
-              className="p-1.5 rounded bg-[#12284C] border border-white/10 text-slate-300 hover:text-amber-400"
-              title="Developer DB Connections"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
+
 
             {/* Main Action buttons */}
             {currentUser && (
@@ -1121,68 +1582,12 @@ function App() {
         </div>
       </header>
 
-      {/* ----------------------------------------------------
-          DEVELOPER CONSOLE (LIVE DB INTEGRATION)
-          ---------------------------------------------------- */}
-      {showDevConsole && (
-        <div className="max-w-4xl mx-auto mt-4 px-4">
-          <div className="bg-slate-900 border-2 border-[#1A3A6B] text-white p-5 rounded-xl relative shadow-lg">
-            <button 
-              onClick={() => setShowDevConsole(false)} 
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <h3 className="text-amber-400 font-mono text-sm uppercase font-black flex items-center gap-2 mb-2">
-              <Layers className="w-4 h-4" />
-              Smart FIR Developer Integration Dashboard
-            </h3>
-            <p className="text-xs text-slate-300 mb-4 leading-relaxed">
-              Connect this responsive LegalTech portal to your own Firebase project. Paste your standard Firebase Configuration JSON. If left empty, the application runs 100% flawlessly locally using client-side fallback storage.
-            </p>
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <label className="block text-[10px] text-amber-400 font-mono uppercase mb-1">Firebase Config JSON Object</label>
-                <textarea 
-                  value={apiConfigInput} 
-                  onChange={(e) => setApiConfigInput(e.target.value)}
-                  placeholder='{"apiKey": "AIzaSy...", "authDomain": "...", "projectId": "..."}' 
-                  className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs font-mono min-h-[100px] text-slate-300"
-                />
-              </div>
-            </div>
-            <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-800">
-              <span className="text-[10px] text-emerald-400 font-mono">
-                System Storage Engine: <span className="font-bold underline">{authService.isFirebaseActive() ? 'LIVE_FIREBASE_CONNECTED' : 'LOCAL_STORAGE_FALLBACK'}</span>
-              </span>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => {
-                    setApiConfigInput('');
-                    localStorage.removeItem("firebaseConfig");
-                    alert("Cleared custom credentials.");
-                    window.location.reload();
-                  }}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded font-bold"
-                >
-                  Clear Config
-                </button>
-                <button 
-                  onClick={saveDeveloperConfig}
-                  className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black rounded"
-                >
-                  Save & Bind DB
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* ----------------------------------------------------
           MAIN SCREEN ROUTER VIEW
           ---------------------------------------------------- */}
-      <main className="max-w-7xl mx-auto px-4 mt-6">
+      <main className={`max-w-7xl mx-auto px-4 mt-6 ${currentUser ? 'pb-28' : ''}`}>
 
         {/* 1. SPLASH SCREEN & LANGUAGE SELECTOR */}
         {currentScreen === 'splash' && (
@@ -1468,6 +1873,57 @@ function App() {
                   </button>
                 </div>
 
+                {/* Step-by-Step Guided FIR Wizard Launch Card */}
+                <div className="bg-gradient-to-r from-[#1A3A6B] to-[#0E2347] border border-[#1A3A6B] p-6 rounded-3xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 shadow-md">
+                  <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-[0.06] text-white pointer-events-none">
+                    <Scale className="w-48 h-48" />
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-white/10 text-white flex items-center justify-center border border-white/20 shrink-0">
+                      <FileText className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="text-base font-black text-white">
+                          {language === 'en' ? 'Step-by-Step Guided FIR Wizard' : language === 'hi' ? 'चरण-दर-चरण एफआईआर विज़ार्ड' : 'मार्गदर्शित एफआयआर विझार्ड'}
+                        </h4>
+                        <span className="text-[8px] bg-amber-400 text-amber-900 font-black px-2 py-0.5 rounded uppercase tracking-wider">NEW</span>
+                      </div>
+                      <p className="text-xs text-white/70 leading-relaxed max-w-lg">
+                        {language === 'en'
+                          ? 'File a structured complaint in 8 easy steps. Select complaint type, describe incident, upload evidence, get BNS 2023 legal section suggestions and download a ready-to-submit PDF draft.'
+                          : 'आसान 8 चरणों में संरचित शिकायत दर्ज करें। अपराध का प्रकार, स्थान, गवाह, और BNS 2023 धाराएं स्वचालित रूप से सुझाई जाती हैं।'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setWizardCategory(null);
+                      setWizardStep(1);
+                      setWizardForm({
+                        incidentDesc: '',
+                        incidentDate: new Date().toISOString().slice(0, 16),
+                        incidentLocation: '',
+                        stolenItems: '',
+                        estimatedValue: '',
+                        transactionId: '',
+                        platformName: '',
+                        complainantName: '',
+                        complainantPhone: '',
+                        complainantAddress: '',
+                        accusedDesc: '',
+                        witnessName: ''
+                      });
+                      setCurrentScreen('stepwizard');
+                    }}
+                    className="bg-white hover:bg-slate-100 text-[#1A3A6B] px-6 py-3 rounded-xl text-xs uppercase font-black shrink-0 shadow flex items-center gap-1.5 transition-all"
+                  >
+                    {language === 'en' ? 'Start Wizard' : 'विज़ार्ड शुरू करें'} <ChevronRight className="w-4.5 h-4.5" />
+                  </button>
+                </div>
+
                 {/* Evidence Locker Widget */}
                 <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">
                   <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
@@ -1707,693 +2163,978 @@ function App() {
 
         {/* 4. AI CHAT COMPANION */}
         {currentScreen === 'chat' && (
-          <div className="max-w-4xl mx-auto">
-            
-            {/* Chat header */}
-            <div className="bg-white border border-slate-200 p-4 rounded-t-3xl border-b-2 border-b-[#1A3A6B] flex items-center justify-between gap-3 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#E8EEF5] flex items-center justify-center border border-[#1A3A6B]/20 text-[#1A3A6B]">
-                  <Shield className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800">Legal AI Companion</h4>
-                  <span className="text-[9px] text-[#1A3A6B] flex items-center gap-1 font-bold">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#1A3A6B] animate-ping"></div>
-                    Active &bull; Multilingual Assistant
-                  </span>
-                </div>
-              </div>
+          <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
+
+            {/* Left Column: Chat History & Input */}
+            <div className="lg:col-span-9 flex flex-col h-[600px] bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
               
-              <button 
-                onClick={() => speakText("Jai Hind! Describe the legal incident, and I will assist in drafting your FIR copy.")}
-                className="p-2 rounded bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-[#1A3A6B]"
-                title="Speak Assist Audio"
-              >
-                <Volume2 className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Chat Messages */}
-            <div className="h-[400px] overflow-y-auto bg-white border border-slate-200 p-6 flex flex-col gap-4 custom-scrollbar shadow-inner">
-              {chatHistory.map((msg, i) => (
-                <div 
-                  key={i} 
-                  className={`flex flex-col max-w-[80%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}
-                >
-                  <div className={`p-4 rounded-2xl text-xs leading-relaxed ${
-                    msg.role === 'user' 
-                      ? 'bg-[#1A3A6B] text-white font-semibold rounded-tr-none shadow' 
-                      : 'bg-slate-50 text-slate-800 border border-slate-200 rounded-tl-none shadow-sm'
-                  }`}>
-                    {msg.text.split('\n').map((para, k) => (
-                      <p key={k} className={k > 0 ? "mt-2" : ""}>{para}</p>
-                    ))}
-
-                    {/* Category suggestions */}
-                    {msg.isClassificationPrompt && (
-                      <div className="mt-4 p-3 rounded-xl bg-white border border-[#1A3A6B]/30 shadow-sm">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Classified Incident:</span>
-                          <span className="text-[10px] font-black text-[#1A3A6B] px-2 py-0.5 rounded bg-[#E8EEF5]">
-                            {msg.categorySuggested}
-                          </span>
-                        </div>
-                        <p className="text-[9px] text-slate-400 mb-3">Proceed to start the 5 contextual follow-up questions tailored for this offense category.</p>
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => confirmAIClassification(msg.categorySuggested)}
-                            className="cyber-btn-blue px-3 py-1.5 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm"
-                          >
-                            Yes, Start Flow <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
-                          <button 
-                            onClick={() => {
-                              setCurrentScreen('classification');
-                            }}
-                            className="px-3 py-1.5 rounded bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold"
-                          >
-                            Re-Classify Category
-                          </button>
-                        </div>
-                      </div>
+              {/* Chat header */}
+              <div className="bg-white p-4 border-b border-slate-100 flex items-center justify-between gap-3 shadow-sm shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#E8EEF5] flex items-center justify-center border border-[#1A3A6B]/20 text-[#1A3A6B]">
+                    <Shield className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800">Smart FIR AI Assistant</h4>
+                    {isApiConnected ? (
+                      <span className="text-[9px] text-green-600 font-bold flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-ping"></div> AI Connected &bull; Multilingual Guidance
+                      </span>
+                    ) : (
+                      <span className="text-[9px] text-amber-600 font-bold flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div> Basic Guidance Mode &bull; Multilingual
+                      </span>
                     )}
                   </div>
-                  <span className="text-[8px] text-slate-400 mt-1 font-mono uppercase">
-                    {msg.role === 'user' ? 'Citizen' : 'Portal AI'}
-                  </span>
                 </div>
-              ))}
-
-              {isTyping && (
-                <div className="self-start flex items-center gap-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 rounded-tl-none">
-                  <div className="dots-flashing"></div>
-                </div>
-              )}
-            </div>
-
-            {/* Warning Card */}
-            {showWarning && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-xl mt-3 flex items-start gap-2.5 text-xs text-red-800">
-                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                <div>
-                  <h5 className="font-bold text-slate-800 uppercase tracking-wider">{text.warningTitle}</h5>
-                  <p className="mt-0.5 leading-normal">{text.warningAadhaar}</p>
-                </div>
-                <button onClick={() => setShowWarning(false)} className="text-slate-400 hover:text-slate-600 shrink-0 ml-auto">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-
-            {/* Quick Suggestions Chips */}
-            <div className="flex flex-wrap gap-2 mt-4">
-              <button 
-                onClick={() => submitChatMessage("My gold wallet was stolen from my shoulder bag in a local bus.")}
-                className="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600 hover:text-[#1A3A6B] hover:border-[#1A3A6B]/30 text-xs font-semibold shadow-sm"
-              >
-                &bull; Theft Example
-              </button>
-              <button 
-                onClick={() => submitChatMessage("I lost 25,000 Rupees from a UPI debit call claiming to be an official bank agent asking for OTP.")}
-                className="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600 hover:text-[#1A3A6B] hover:border-[#1A3A6B]/30 text-xs font-semibold shadow-sm"
-              >
-                &bull; Cyber Fraud Example
-              </button>
-              <button 
-                onClick={() => submitChatMessage("A stranger followed me from the Sakinaka metro gate and shouted offensive threats.")}
-                className="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600 hover:text-[#1A3A6B] hover:border-[#1A3A6B]/30 text-xs font-semibold shadow-sm"
-              >
-                &bull; Harassment Example
-              </button>
-            </div>
-
-            {/* Input wave Voice */}
-            {isVoiceRecording && (
-              <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center text-center">
-                <span className="text-xs text-[#1A3A6B] font-mono uppercase mb-2 animate-pulse">{text.voiceInputActive}</span>
-                <div className="flex items-center gap-1.5 h-8">
-                  <div className="w-1.5 bg-[#1A3A6B] rounded animate-[bounce_0.8s_infinite] h-6"></div>
-                  <div className="w-1.5 bg-amber-500 rounded animate-[bounce_0.6s_infinite] h-4"></div>
-                  <div className="w-1.5 bg-[#1A3A6B] rounded animate-[bounce_0.9s_infinite] h-7"></div>
-                  <div className="w-1.5 bg-amber-500 rounded animate-[bounce_0.5s_infinite] h-3"></div>
-                </div>
-              </div>
-            )}
-
-            {/* Input box */}
-            <div className="mt-4 flex gap-3">
-              <button 
-                onClick={simulateVoiceInput}
-                className={`p-3.5 rounded-2xl border transition-all shrink-0 ${
-                  isVoiceRecording 
-                    ? 'bg-red-600 border-red-600 text-white animate-pulse' 
-                    : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-[#1A3A6B] hover:bg-slate-100'
-                }`}
-                title={text.voiceInputClick}
-              >
-                <Mic className="w-5 h-5" />
-              </button>
-              
-              <input 
-                type="text"
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && submitChatMessage()}
-                placeholder={text.enterMessage}
-                className="w-full glass-input"
-              />
-
-              <button 
-                onClick={() => submitChatMessage()}
-                className="cyber-btn-blue px-6 py-3.5 rounded-2xl text-xs font-black uppercase shrink-0"
-              >
-                {text.send}
-              </button>
-            </div>
-
-            <div className="mt-6 text-center">
-              <button 
-                onClick={() => setCurrentScreen('dashboard')}
-                className="text-xs text-slate-500 hover:text-[#1A3A6B] flex items-center gap-1.5 mx-auto transition-all"
-              >
-                <ArrowLeft className="w-4 h-4" /> {text.backToDashboard}
-              </button>
-            </div>
-
-          </div>
-        )}
-
-        {/* 5. INCIDENT CLASSIFICATION SCREEN */}
-        {currentScreen === 'classification' && (
-          <div className="max-w-2xl mx-auto text-center">
-            
-            <div className="w-14 h-14 rounded-2xl bg-[#E8EEF5] flex items-center justify-center mx-auto mb-5 border border-[#1A3A6B]/20">
-              <Layers className="w-7 h-7 text-[#1A3A6B]" />
-            </div>
-
-            <h2 className="text-2xl font-black text-slate-800 mb-1">{text.classificationTitle}</h2>
-            <p className="text-xs text-slate-500 max-w-md mx-auto mb-6">
-              {text.confirmCategory}
-            </p>
-
-            <div className="bg-white border-2 border-[#1A3A6B] p-6 rounded-3xl mb-8 relative text-left shadow-sm">
-              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">prima facie AI classification</span>
-                <span className={`px-2.5 py-1 rounded text-xs font-black tracking-widest ${
-                  severity === 'LOW' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
-                  severity === 'MEDIUM' ? 'bg-amber-50 text-amber-800 border border-amber-200' :
-                  'bg-red-50 text-red-800 border border-red-200 animate-pulse'
-                }`}>
-                  {severity} SEVERITY
-                </span>
-              </div>
-
-              <div className="mb-4">
-                <div className="text-xl font-black text-[#1A3A6B]">{classifiedCategory}</div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 mb-6">
-                <h5 className="font-bold text-[#1A3A6B] mb-2 flex items-center gap-1">
-                  <Shield className="w-4 h-4" />
-                  Indian Codification References:
-                </h5>
-                <p className="mb-1"><strong>IPC 1860 (Old Code):</strong> {getLegalSections(classifiedCategory).ipc}</p>
-                <p className="mb-2"><strong>BNS 2023 (New Code):</strong> {getLegalSections(classifiedCategory).bns}</p>
-                <p className="text-slate-500 mt-2 font-mono text-[10.5px] italic leading-normal border-t border-slate-200 pt-2">{getLegalSections(classifiedCategory).desc}</p>
-              </div>
-
-              <button 
-                onClick={() => confirmAIClassification(classifiedCategory)}
-                className="w-full cyber-btn-blue py-3.5 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-2 shadow"
-              >
-                {text.confirmProceed}
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Category options listing */}
-            <div className="bg-white border border-slate-200 p-6 rounded-3xl text-left shadow-sm">
-              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5 mb-4">
-                {text.changeCategory}
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                {Object.keys(CATEGORY_QUESTIONS).map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => {
-                      setClassifiedCategory(cat);
-                      setSeverity(getLegalSections(cat).severity);
-                    }}
-                    className={`p-3 text-left rounded-xl text-xs font-bold border transition-all ${
-                      classifiedCategory === cat 
-                        ? 'bg-[#E8EEF5] border-[#1A3A6B] text-[#1A3A6B] font-black' 
-                        : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-          </div>
-        )}
-
-        {/* 6. GUIDED QUESTIONNAIRE SCREEN */}
-        {currentScreen === 'questions' && (
-          <div className="max-w-xl mx-auto">
-            
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[9px] text-[#1A3A6B] font-bold uppercase tracking-wider font-mono">
-                Guided FIR Docket Flow
-              </span>
-              <span className="text-[10px] text-slate-500 font-bold">
-                Question <strong className="text-slate-800">{currentQuestionIdx + 1}</strong> of <strong>{guidedQuestions.length}</strong>
-              </span>
-            </div>
-
-            <div className="w-full bg-slate-200 h-1.5 rounded-full mb-6 overflow-hidden">
-              <div 
-                className="h-full bg-[#1A3A6B] rounded-full transition-all duration-300" 
-                style={{ width: `${((currentQuestionIdx + 1) / guidedQuestions.length) * 100}%` }}
-              ></div>
-            </div>
-
-            <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-md relative overflow-hidden mb-6">
-              
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[9px] text-[#1A3A6B] font-bold border border-[#1A3A6B]/30 px-2 py-0.5 rounded bg-[#E8EEF5] uppercase">
-                  {classifiedCategory}
-                </span>
                 
                 <button 
-                  onClick={() => speakText(guidedQuestions[currentQuestionIdx]?.q)}
-                  className="p-1.5 rounded bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 hover:text-[#1A3A6B]"
-                  title="Read out loud"
+                  onClick={() => speakText("Jai Hind! Describe the legal incident, and I will assist in drafting your FIR copy.")}
+                  className="p-2 rounded bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-[#1A3A6B]"
+                  title="Speak Assist Audio"
                 >
                   <Volume2 className="w-4 h-4" />
                 </button>
               </div>
 
-              <h3 className="text-base font-black text-slate-800 leading-snug mb-5">
-                {guidedQuestions[currentQuestionIdx]?.q}
-              </h3>
+              {/* Chat Messages */}
+              <div className="flex-1 overflow-y-auto bg-slate-50/30 p-6 flex flex-col gap-6 custom-scrollbar">
+                {chatHistory.length === 0 && (
+                  <div className="flex flex-col items-center justify-center p-8 text-center opacity-85 my-auto">
+                    <div className="w-14 h-14 bg-[#E8EEF5] rounded-2xl flex items-center justify-center mb-4 border border-[#1A3A6B]/20 text-[#1A3A6B]">
+                      <MessageSquare className="w-6 h-6" />
+                    </div>
+                    <h3 className="font-bold text-slate-800 mb-2 text-sm">Smart FIR AI Assistant</h3>
+                    <p className="text-xs text-slate-500 max-w-sm leading-relaxed">Describe the offense or incident in natural language. The AI will guide you step by step to generate your formal FIR draft copy.</p>
+                  </div>
+                )}
 
-              {guidedQuestions[currentQuestionIdx]?.type === 'select' ? (
-                <div className="flex flex-col gap-2">
-                  {guidedQuestions[currentQuestionIdx]?.options.map((opt, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleQuestionAnswerSubmit(opt)}
-                      className="w-full p-3.5 text-left rounded-xl bg-slate-50 hover:bg-[#E8EEF5] border border-slate-200 hover:border-[#1A3A6B] font-bold text-xs text-slate-700 hover:text-[#1A3A6B] transition-all"
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div>
-                  <textarea 
-                    className="w-full glass-input p-4 rounded-xl text-xs min-h-[100px] mb-4"
-                    placeholder={guidedQuestions[currentQuestionIdx]?.placeholder}
-                    id={`answer-textarea-${currentQuestionIdx}`}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        const val = e.currentTarget.value;
-                        if (val.trim()) {
-                          handleQuestionAnswerSubmit(val);
-                          e.currentTarget.value = '';
-                        }
-                      }
-                    }}
-                  />
-                  <button
-                    onClick={() => {
-                      const el = document.getElementById(`answer-textarea-${currentQuestionIdx}`);
-                      if (el && el.value.trim()) {
-                        handleQuestionAnswerSubmit(el.value);
-                        el.value = '';
-                      } else {
-                        handleQuestionAnswerSubmit("Declined details");
-                      }
-                    }}
-                    className="w-full cyber-btn-blue py-3 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 shadow"
+                {chatHistory.map((msg, i) => (
+                  <div 
+                    key={i} 
+                    className={`flex flex-col max-w-[75%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'} z-10`}
                   >
-                    Submit Entry <ArrowRight className="w-4 h-4" />
+                    <div className={`p-3.5 px-4 rounded-2xl text-xs leading-relaxed ${
+                      msg.role === 'user' 
+                        ? 'bg-[#1A3A6B] text-white font-semibold rounded-tr-none shadow-sm' 
+                        : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none shadow-sm'
+                    }`}>
+                      {msg.text.split('\n').map((para, k) => (
+                        <p key={k} className={k > 0 ? "mt-2" : ""}>{para}</p>
+                      ))}
+
+                      {/* AI Draft readiness block */}
+                      {msg.draftData && msg.draftData.isReady && (
+                        <div className="mt-4 p-3 bg-green-50/50 border border-green-500/30 shadow-sm rounded-xl text-slate-800">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">FIR DRAFT STATUS:</span>
+                            <span className="text-[9.5px] font-black text-green-700 px-2 py-0.5 rounded bg-green-100 border border-green-200">
+                              FIR-READY COMPLAINT GENERATED
+                            </span>
+                          </div>
+                          <p className="text-[9.5px] text-slate-500 mb-3 font-medium">All critical information has been successfully collected by the AI Assistant.</p>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => {
+                                setGuidedQuestions(CATEGORY_QUESTIONS[msg.draftData.category] || CATEGORY_QUESTIONS["Other"]);
+                                setCurrentScreen('preview');
+                              }}
+                              className="bg-green-700 hover:bg-green-800 text-white px-3.5 py-2 rounded-xl text-[10px] font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                            >
+                              Proceed to FIR Preview <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <span className="text-[8px] text-slate-400 mt-1 font-mono uppercase tracking-wider">
+                      {msg.role === 'user' ? 'Citizen' : 'Smart FIR AI'}
+                    </span>
+                  </div>
+                ))}
+
+                {isTyping && (
+                  <div className="self-start flex items-center gap-3 p-3 px-4 rounded-2xl bg-white border border-slate-200 rounded-tl-none shadow-sm max-w-[75%] z-10 shrink-0">
+                    <div className="flex gap-1 shrink-0">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#1A3A6B] animate-bounce"></div>
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#1A3A6B] animate-bounce [animation-delay:0.2s]"></div>
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#1A3A6B] animate-bounce [animation-delay:0.4s]"></div>
+                    </div>
+                    <span className="text-[11px] text-[#1A3A6B] font-bold">Smart FIR Assistant is typing...</span>
+                  </div>
+                )}
+
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Warning Card inside sticky input panel */}
+              {showWarning && (
+                <div className="px-4 py-2 bg-red-50 border-t border-red-200 flex items-start gap-2.5 text-xs text-red-800 shrink-0">
+                  <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h5 className="font-bold text-slate-800 uppercase tracking-wider">{text.warningTitle}</h5>
+                    <p className="mt-0.5 leading-normal">{text.warningAadhaar}</p>
+                  </div>
+                  <button onClick={() => setShowWarning(false)} className="text-slate-400 hover:text-slate-600 shrink-0 ml-auto">
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               )}
+
+              {/* Sticky Bottom Panel */}
+              <div className="bg-white border-t border-slate-100 p-4 shrink-0 flex flex-col gap-3">
+                
+                {/* Quick Suggestions Chips */}
+                <div className="flex flex-wrap gap-2 pb-1 max-h-16 custom-scrollbar shrink-0">
+                  <button 
+                    onClick={() => submitChatMessage("My phone was stolen")}
+                    className="px-3.5 py-2 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-[#1A3A6B] hover:border-[#1A3A6B]/30 text-xs font-semibold shadow-sm transition-all"
+                  >
+                    My phone was stolen
+                  </button>
+                  <button 
+                    onClick={() => submitChatMessage("Online fraud happened")}
+                    className="px-3.5 py-2 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-[#1A3A6B] hover:border-[#1A3A6B]/30 text-xs font-semibold shadow-sm transition-all"
+                  >
+                    Online fraud happened
+                  </button>
+                  <button 
+                    onClick={() => submitChatMessage("I am being harassed")}
+                    className="px-3.5 py-2 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-[#1A3A6B] hover:border-[#1A3A6B]/30 text-xs font-semibold shadow-sm transition-all"
+                  >
+                    I am being harassed
+                  </button>
+                  <button 
+                    onClick={() => submitChatMessage("Accident happened")}
+                    className="px-3.5 py-2 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-[#1A3A6B] hover:border-[#1A3A6B]/30 text-xs font-semibold shadow-sm transition-all"
+                  >
+                    Accident happened
+                  </button>
+                </div>
+
+                {/* Input box */}
+                <div className="flex gap-3 items-center shrink-0">
+                  <button 
+                    onClick={simulateVoiceInput}
+                    className={`p-3.5 rounded-2xl border transition-all shrink-0 ${
+                      isVoiceRecording 
+                        ? 'bg-red-600 border-red-600 text-white animate-pulse' 
+                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-[#1A3A6B] hover:bg-slate-100'
+                    }`}
+                    title={text.voiceInputClick}
+                  >
+                    <Mic className="w-5 h-5" />
+                  </button>
+                  
+                  <input 
+                    type="text"
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && submitChatMessage()}
+                    placeholder={text.enterMessage}
+                    className="w-full glass-input"
+                  />
+
+                  <button 
+                    onClick={() => submitChatMessage()}
+                    className="bg-[#1A3A6B] hover:bg-[#12284C] text-white px-6 py-3.5 rounded-2xl text-xs font-black uppercase shrink-0 transition-colors"
+                  >
+                    {text.send}
+                  </button>
+                </div>
+
+                {/* Navigation Back button */}
+                <div className="text-center pt-1 border-t border-slate-50 shrink-0">
+                  <button 
+                    onClick={() => setCurrentScreen('dashboard')}
+                    className="text-xs text-slate-500 hover:text-[#1A3A6B] flex items-center gap-1.5 mx-auto transition-all"
+                  >
+                    <ArrowLeft className="w-4 h-4" /> {text.backToDashboard}
+                  </button>
+                </div>
+
+              </div>
+
             </div>
 
-            <div className="flex justify-between items-center px-1">
-              <button 
-                onClick={() => {
-                  if (currentQuestionIdx > 0) {
-                    setCurrentQuestionIdx(prev => prev - 1);
-                  } else {
-                    setCurrentScreen('classification');
-                  }
-                }}
-                className="text-xs text-slate-500 hover:text-[#1A3A6B] flex items-center gap-1"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" /> Back Step
-              </button>
-              <button 
-                onClick={() => setCurrentScreen('rights')}
-                className="text-xs text-[#1A3A6B]/80 hover:text-[#1A3A6B] font-semibold"
-              >
-                Skip to Rights Explainer &bull;&bull;
-              </button>
+            {/* Right Column: Compact Readiness Sidebar */}
+            <div className="lg:col-span-3 flex flex-col gap-4">
+              <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
+                <div className="border-b border-slate-100 pb-2 mb-3">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider font-mono">Readiness Dashboard</span>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-base font-black text-slate-800">{getCompleteness()}% Complete</span>
+                  </div>
+                  
+                  {/* Horizontal progress bar */}
+                  <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2">
+                    <div className="bg-[#1A3A6B] h-1.5 rounded-full transition-all duration-500" style={{ width: getCompleteness() + '%' }}></div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-[11px] p-2 rounded-lg bg-slate-50/50 border border-slate-100">
+                    <span className="text-slate-600 font-bold">Complainant Profile</span>
+                    {(userProfile.name && userProfile.name !== "Anonymous Citizen") ? <Check className="w-4 h-4 text-emerald-500 font-bold" /> : <AlertTriangle className="w-4 h-4 text-amber-500" />}
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] p-2 rounded-lg bg-slate-50/50 border border-slate-100">
+                    <span className="text-slate-600 font-bold">Incident Date/Time</span>
+                    {(answers.incidentDate && !answers.incidentDate.includes("T")) ? <Check className="w-4 h-4 text-emerald-500 font-bold" /> : <AlertTriangle className="w-4 h-4 text-amber-500" />}
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] p-2 rounded-lg bg-slate-50/50 border border-slate-100">
+                    <span className="text-slate-600 font-bold">Place of Occurrence</span>
+                    {(answers.incidentLocation && answers.incidentLocation !== "Sakinaka metro junction, Mumbai") ? <Check className="w-4 h-4 text-emerald-500 font-bold" /> : <AlertTriangle className="w-4 h-4 text-amber-500" />}
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] p-2 rounded-lg bg-slate-50/50 border border-slate-100">
+                    <span className="text-slate-600 font-bold">Detailed Statement</span>
+                    {(answers.incidentDesc && answers.incidentDesc.length >= 15) ? <Check className="w-4 h-4 text-emerald-500 font-bold" /> : <AlertTriangle className="w-4 h-4 text-amber-500" />}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
+                <h4 className="text-[10px] font-black text-slate-800 pb-2 mb-3 border-b border-slate-100 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500 animate-pulse" /> Detected Missing Info
+                </h4>
+                {getMissingFields().length === 0 ? (
+                  <p className="text-xs text-emerald-600 font-bold flex items-center gap-1.5 bg-emerald-50 p-2.5 rounded-lg border border-emerald-100"><Check className="w-4 h-4" /> All critical fields successfully logged.</p>
+                ) : (
+                  <ul className="flex flex-col gap-2.5">
+                    {getMissingFields().map((f, idx) => (
+                      <li key={idx} className="text-[10px] text-slate-700 flex items-start gap-2 p-2 bg-amber-50/60 rounded border border-amber-100/60 shadow-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 mt-1"></span>
+                        <span>Please mention the <strong>{f}</strong> in your statement.</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
 
           </div>
         )}
 
-        {/* 7. RIGHTS EXPLAINER SCREEN */}
-        {currentScreen === 'rights' && (
-          <div className="max-w-3xl mx-auto">
-            
-            <div className="text-center mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-[#E8EEF5] flex items-center justify-center mx-auto mb-4 border border-[#1A3A6B]/20">
-                <Scale className="w-6 h-6 text-[#1A3A6B]" />
-              </div>
-              <h2 className="text-xl font-black text-slate-800 mb-1">{text.legalRightsTitle}</h2>
-              <p className="text-xs text-slate-500 leading-normal max-w-xl mx-auto">
-                {text.rightsSub}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              
-              <div className="bg-white p-5 rounded-2xl border-l-4 border-[#1A3A6B] shadow-sm">
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <h4 className="text-xs font-black text-[#1A3A6B] uppercase tracking-wider">1. RIGHT TO FREE PHYSICAL COPY</h4>
-                  <span className="text-[8px] font-mono text-[#1A3A6B] bg-[#E8EEF5] px-2 py-0.5 rounded font-bold">Sec 154 CrPC</span>
-                </div>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  As the informant filing an FIR, you are legally entitled to receive a complete copy of the registered FIR immediately. Police officers cannot charge any fees for this record.
-                </p>
-              </div>
-
-              <div className="bg-white p-5 rounded-2xl border-l-4 border-[#1A3A6B] shadow-sm">
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <h4 className="text-xs font-black text-[#1A3A6B] uppercase tracking-wider">2. RIGHT TO FILE ZERO FIR</h4>
-                  <span className="text-[8px] font-mono text-[#1A3A6B] bg-[#E8EEF5] px-2 py-0.5 rounded font-bold">Supreme Court</span>
-                </div>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  A police station is mandated to record your FIR even if the incident occurred outside their designated jurisdiction boundary. It gets logged as a 'Zero FIR' and shifted internally.
-                </p>
-              </div>
-
-              {classifiedCategory === "Cybercrime / Fraud" && (
-                <>
-                  <div className="bg-white p-5 rounded-2xl border-l-4 border-amber-600 shadow-sm col-span-1 md:col-span-2">
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <h4 className="text-xs font-black text-amber-800 uppercase tracking-wider">CYBER CELL HELPLINE MANDATE</h4>
-                      <span className="text-[8px] font-mono text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-bold">IT Act</span>
-                    </div>
-                    <p className="text-xs text-slate-500 leading-relaxed">
-                      All cybercrimes involving digital fraud must be expedited. Logging details into the <strong>1930 National Cyber Fraud portal</strong> immediately alerts banks to freeze transitioning funds in real-time.
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {(classifiedCategory === "Harassment / Stalking" || classifiedCategory === "Domestic Violence") && (
-                <>
-                  <div className="bg-white p-5 rounded-2xl border-l-4 border-rose-600 shadow-sm col-span-1 md:col-span-2">
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <h4 className="text-xs font-black text-rose-800 uppercase tracking-wider">RIGHT TO FEMALE OFFICER HANDLING</h4>
-                      <span className="text-[8px] font-mono text-rose-700 bg-rose-50 px-2 py-0.5 rounded font-bold">Sec 173 BNS</span>
-                    </div>
-                    <p className="text-xs text-slate-500 leading-relaxed">
-                      By law, FIR registration and statement recording for women-related offenses must be completed by a female police officer or in the presence of female guardians at all times.
-                    </p>
-                  </div>
-                </>
-              )}
-
-            </div>
-
-            <div className="text-center">
-              <button 
-                onClick={() => setCurrentScreen('preview')}
-                className="cyber-btn-blue px-8 py-3.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 mx-auto shadow"
-              >
-                {text.proceedToDraft} <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-
-          </div>
-        )}
-
-        {/* 8. FIR DRAFT PREVIEW & BILINGUAL TOGGLE */}
-        {currentScreen === 'preview' && (
-          <div className="max-w-4xl mx-auto">
-            
+        {/* 5. UNIFIED STEP-BY-STEP FIR WIZARD */}
+        {currentScreen === 'stepwizard' && (
+          <div className="max-w-4xl mx-auto text-left">
+            {/* Header: Title and Top Step Bar */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
               <div>
-                <h2 className="text-xl font-black text-slate-800">{text.firDraftTitle}</h2>
-                <p className="text-xs text-slate-500 mt-1">{text.firDraftSub}</p>
+                <h2 className="text-xl font-black text-slate-800 uppercase tracking-wider">
+                  {language === 'en' ? 'Guided FIR Wizard' : language === 'hi' ? 'प्राथमिकी विज़ार्ड' : 'मार्गदर्शित एफआयआर सहाय्यक'}
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  {language === 'en' ? 'Complete the steps below to draft a legally compliant complaint' : 'एक वैध कानूनी शिकायत पत्र का मसौदा तैयार करने के लिए चरणों को पूरा करें'}
+                </p>
               </div>
-              <div className="flex gap-2 shrink-0">
-                <button 
-                  onClick={() => setCurrentScreen('questions')}
-                  className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-bold"
-                >
-                  Edit Answers
-                </button>
-                <button 
-                  onClick={exportFIRDraftPDF}
-                  className="cyber-btn-blue px-5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow"
-                >
-                  <Download className="w-4 h-4" /> {text.downloadPdf}
-                </button>
-              </div>
-            </div>
-
-            {/* Bilingual Tab Selector for rendering preview */}
-            <div className="flex border-b border-slate-200 mb-4">
-              <button
-                onClick={() => setDraftLangTab('en')}
-                className={`px-4 py-2.5 text-xs font-black uppercase border-b-2 ${draftLangTab === 'en' ? 'border-[#1A3A6B] text-[#1A3A6B]' : 'border-transparent text-slate-500'}`}
-              >
-                English Version
-              </button>
-              <button
-                onClick={() => setDraftLangTab('hi')}
-                className={`px-4 py-2.5 text-xs font-black uppercase border-b-2 ${draftLangTab === 'hi' ? 'border-[#1A3A6B] text-[#1A3A6B]' : 'border-transparent text-slate-500'}`}
-              >
-                Hindi Version (हिंदी संस्करण)
-              </button>
-            </div>
-
-            {/* Official Looking Document preview */}
-            <div className="bg-white text-slate-900 p-8 rounded-3xl shadow-md border-8 border-slate-200 font-mono text-xs leading-relaxed max-h-[600px] overflow-y-auto custom-scrollbar relative">
               
-              {/* Draft Watermark watermark */}
-              <div className="absolute inset-0 flex items-center justify-center select-none pointer-events-none opacity-[0.03] transform -rotate-45">
-                <span className="text-[55px] font-black tracking-widest text-[#1A3A6B]">SMART FIR PORTAL DRAFT</span>
+              {/* Progress pill */}
+              <div className="flex items-center gap-2 bg-[#E8EEF5] px-3.5 py-1.5 rounded-xl border border-[#1A3A6B]/15 text-xs font-black text-[#1A3A6B] shrink-0 font-mono">
+                {wizardCategory === null ? (
+                  <span>STEP 1 OF 8</span>
+                ) : (
+                  <span>STEP {wizardStep} OF 8</span>
+                )}
               </div>
+            </div>
 
-              {/* Document Strip Accent */}
-              <div className="flex h-1.5 w-full mb-6">
-                <div className="flex-1 bg-[#D97706]"></div>
-                <div className="flex-1 bg-[#FFFFFF]"></div>
-                <div className="flex-1 bg-[#16A34A]"></div>
-              </div>
+            {/* Progress Bar Track */}
+            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mb-8 border border-slate-200/50 flex">
+              <div 
+                className="bg-[#1A3A6B] h-full transition-all duration-500" 
+                style={{ width: `${((wizardCategory === null ? 1 : wizardStep) / 8) * 100}%` }}
+              ></div>
+            </div>
 
-              {/* Render dynamic translations */}
-              {(() => {
-                const trans = TRANSLATED_COMPLAINT[draftLangTab] || TRANSLATED_COMPLAINT['en'];
-                const legalDetails = getLegalSections(classifiedCategory);
+            <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm min-h-[400px] flex flex-col justify-between">
+              
+              {/* ----------------------------------------------------
+                    STEP 1: SELECT COMPLAINT TYPE
+                    ---------------------------------------------------- */}
+              {wizardCategory === null && (
+                <div>
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-6">
+                    {language === 'en' ? 'Step 1: Select Complaint Category' : 'चरण 1: शिकायत की श्रेणी चुनें'}
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                      { id: 'Theft', icon: Layers, label: language === 'en' ? 'Theft' : 'चोरी', desc: 'Stolen wallet, jewelry, cash or household items' },
+                      { id: 'Mobile theft', icon: Lock, label: language === 'en' ? 'Mobile Theft' : 'मोबाइल चोरी', desc: 'Device lost, snatched or pickpocketed in public' },
+                      { id: 'Assault', icon: Shield, label: language === 'en' ? 'Assault / Hurt' : 'हमला / चोट', desc: 'Physical violence, battery or physical dispute' },
+                      { id: 'Harassment', icon: User, label: language === 'en' ? 'Harassment' : 'उत्पीड़न', desc: 'Stalking, modesty insult or domestic abuse' },
+                      { id: 'Cyber crime', icon: Lock, label: language === 'en' ? 'Cyber Fraud' : 'साइबर अपराध', desc: 'UPI fraud, phishing, online threats or scams' },
+                      { id: 'Missing person', icon: User, label: language === 'en' ? 'Missing Person' : 'लापता व्यक्ति', desc: 'Reports for missing family members or relatives' },
+                      { id: 'Accident', icon: Scale, label: language === 'en' ? 'Road Accident' : 'सड़क दुर्घटना', desc: 'Vehicular collision or negligent rash driving' },
+                      { id: 'Other', icon: Layers, label: language === 'en' ? 'Other / Custom' : 'अन्य शिकायत', desc: 'Property disputes, public nuisance or custom reports' }
+                    ].map((card) => {
+                      const CardIcon = card.icon;
+                      return (
+                        <div 
+                          key={card.id}
+                          className="p-5 border border-slate-200 rounded-2xl hover:border-[#1A3A6B] hover:shadow-md transition-all flex flex-col justify-between gap-4 text-left group bg-slate-50/50"
+                        >
+                          <div>
+                            <div className="w-10 h-10 rounded-xl bg-slate-100 text-[#1A3A6B] flex items-center justify-center border border-slate-200 group-hover:bg-[#E8EEF5] transition-all">
+                              <CardIcon className="w-5 h-5 text-[#1A3A6B]" />
+                            </div>
+                            <h4 className="font-black text-slate-800 text-sm mt-3">{card.label}</h4>
+                            <p className="text-[10px] text-slate-400 mt-1 leading-normal">{card.desc}</p>
+                          </div>
+                          
+                          <button
+                            onClick={() => {
+                              setWizardCategory(card.id);
+                              setWizardStep(2);
+                            }}
+                            className="w-full py-2 bg-slate-100 group-hover:bg-[#1A3A6B] group-hover:text-white text-slate-700 text-[10px] font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1 uppercase"
+                          >
+                            <span>Start FIR</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-                return (
-                  <div>
-                    <div className="text-center mb-6 border-b-2 border-slate-800 pb-4">
-                      <h3 className="text-sm font-bold tracking-tight text-[#1A3A6B] uppercase">{trans.headerTitle}</h3>
-                      <p className="text-[10px] mt-1 font-bold text-slate-500">{trans.headerSub}</p>
+              {/* ----------------------------------------------------
+                    STEP 2: INCIDENT DETAILS
+                    ---------------------------------------------------- */}
+              {wizardCategory !== null && wizardStep === 2 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-6">
+                    <Layers className="w-4 h-4 text-[#1A3A6B]" />
+                    <h3 className="text-xs font-black text-[#1A3A6B] uppercase tracking-wider">
+                      {language === 'en' ? 'Step 2: Incident Details Statement' : 'चरण 2: घटना का संक्षिप्त विवरण'}
+                    </h3>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-750 mb-1.5 leading-normal">
+                        {language === 'en' 
+                          ? '1. What happened? Describe the incident in simple plain language:' 
+                          : '१. क्या हुआ था? घटना का विवरण सरल शब्दों में लिखें:'}
+                      </label>
+                      <textarea
+                        value={wizardForm.incidentDesc || ''}
+                        onChange={(e) => setWizardForm(prev => ({ ...prev, incidentDesc: e.target.value }))}
+                        rows={5}
+                        placeholder={language === 'en' ? 'Provide a clear explanation including sequence of events, what was said, etc.' : 'घटनाक्रम और बातचीत सहित स्पष्ट विवरण दर्ज करें।'}
+                        className="w-full p-4 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#1A3A6B] focus:border-[#1A3A6B]"
+                      ></textarea>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <p>{trans.state}</p>
-                        <p>{trans.district}</p>
-                        <p>{trans.station}</p>
+                        <label className="block text-xs font-bold text-slate-750 mb-1.5">
+                          {language === 'en' ? '2. Approximate Date and Time:' : '२. घटना की अनुमानित तिथि और समय:'}
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={wizardForm.incidentDate || ''}
+                          onChange={(e) => setWizardForm(prev => ({ ...prev, incidentDate: e.target.value }))}
+                          className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#1A3A6B]"
+                        />
                       </div>
-                      <div>
-                        <p>{trans.refNo}{Date.now().toString().slice(-4)}</p>
-                        <p><strong>{trans.severity}</strong> {severity}</p>
-                      </div>
+                      
+                      {/* Theft Specific Fields */}
+                      {(wizardCategory === 'Theft' || wizardCategory === 'Mobile theft') && (
+                        <>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-750 mb-1.5">
+                              {language === 'en' ? 'Stolen Item Description:' : 'चोरी की गई वस्तुओं का विवरण:'}
+                            </label>
+                            <input
+                              type="text"
+                              value={wizardForm.stolenItems || ''}
+                              onChange={(e) => setWizardForm(prev => ({ ...prev, stolenItems: e.target.value }))}
+                              placeholder={language === 'en' ? 'e.g. iPhone 15 Blue, Leather Wallet' : 'उदा. आईफोन १५, चमड़े का बटुआ'}
+                              className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-750 mb-1.5">
+                              {language === 'en' ? 'Estimated Total Value (INR):' : 'अनुमानित कुल मूल्य (रुपये):'}
+                            </label>
+                            <input
+                              type="number"
+                              value={wizardForm.estimatedValue || ''}
+                              onChange={(e) => setWizardForm(prev => ({ ...prev, estimatedValue: e.target.value }))}
+                              placeholder="e.g. 50000"
+                              className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {/* Cyber Specific Fields */}
+                      {wizardCategory === 'Cyber crime' && (
+                        <>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-750 mb-1.5">
+                              {language === 'en' ? 'Transaction Reference ID (UPI/Bank):' : 'लेनदेन संदर्भ आईडी (UPI/बैंक):'}
+                            </label>
+                            <input
+                              type="text"
+                              value={wizardForm.transactionId || ''}
+                              onChange={(e) => setWizardForm(prev => ({ ...prev, transactionId: e.target.value }))}
+                              placeholder="e.g. TXN987216238"
+                              className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-750 mb-1.5">
+                              {language === 'en' ? 'Platform Name:' : 'प्लेटफार्म का नाम:'}
+                            </label>
+                            <input
+                              type="text"
+                              value={wizardForm.platformName || ''}
+                              onChange={(e) => setWizardForm(prev => ({ ...prev, platformName: e.target.value }))}
+                              placeholder="e.g. Google Pay, WhatsApp"
+                              className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2"
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ----------------------------------------------------
+                    STEP 3: LOCATION DETAILS
+                    ---------------------------------------------------- */}
+              {wizardCategory !== null && wizardStep === 3 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-6">
+                    <MapPin className="w-4 h-4 text-[#1A3A6B]" />
+                    <h3 className="text-xs font-black text-[#1A3A6B] uppercase tracking-wider">
+                      {language === 'en' ? 'Step 3: Location Details & Jurisdiction' : 'चरण 3: घटना का स्थान और अधिकार क्षेत्र'}
+                    </h3>
+                  </div>
+
+                  <div className="space-y-5">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-750 mb-1.5">
+                        {language === 'en' ? 'Incident Occurrence Location:' : 'घटना का विशिष्ट स्थान / पता:'}
+                      </label>
+                      <input
+                        type="text"
+                        value={wizardForm.incidentLocation || ''}
+                        onChange={(e) => setWizardForm(prev => ({ ...prev, incidentLocation: e.target.value }))}
+                        placeholder={language === 'en' ? 'Precise location name, street, nearby landmarks' : 'सटीक स्थान, गली, पास के लैंडमार्क'}
+                        className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#1A3A6B]"
+                      />
                     </div>
 
-                    <div className="border-t border-dashed border-slate-400 my-3"></div>
-
-                    {/* Complainant Ident */}
-                    <div className="mb-4">
-                      <p className="font-bold uppercase mb-1 text-[#1A3A6B]">{trans.section2}</p>
-                      <p>&bull; <strong>{trans.name}</strong> {answers.complainantName}</p>
-                      <p>&bull; <strong>{trans.phone}</strong> {answers.complainantPhone}</p>
-                      <p>&bull; <strong>{trans.city}</strong> {answers.complainantAddress}</p>
-                    </div>
-
-                    <div className="border-t border-dashed border-slate-400 my-3"></div>
-
-                    {/* Occurrence Timeline */}
-                    <div className="mb-4">
-                      <p className="font-bold uppercase mb-1 text-[#1A3A6B]">{trans.section3}</p>
-                      <p>&bull; <strong>{trans.incidentDate}</strong> {answers.incidentDate.replace('T', ' ')}</p>
-                      <p>&bull; <strong>{trans.incidentLoc}</strong> {answers.incidentLocation}</p>
-                      <p>&bull; <strong>{trans.witness}</strong> {answers.witnessName}</p>
-                      <p>&bull; <strong>{trans.accused}</strong> {answers.relationshipAccused}</p>
-                    </div>
-
-                    <div className="border-t border-dashed border-slate-400 my-3"></div>
-
-                    {/* Formal Statement Description */}
-                    <div className="mb-4">
-                      <p className="font-bold uppercase mb-1 text-[#1A3A6B]">{trans.section4}</p>
-                      <p className="bg-slate-50 p-3 rounded border border-slate-200 italic whitespace-pre-wrap leading-relaxed text-slate-700">
-                        {answers.incidentDesc || "Citizen reported incident details of " + classifiedCategory}
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-left">
+                      <h4 className="text-[10px] font-black text-[#1A3A6B] uppercase tracking-wider mb-2">
+                        Precinct Station Map Redirection
+                      </h4>
+                      <p className="text-[10.5px] text-slate-500 leading-normal mb-4">
+                        For official filing, the complaint must resolve to the police station having local jurisdiction over the location. Use locator on bottom navigation bar for real-time precinct GPS mapping.
                       </p>
+                      
+                      <button
+                        onClick={() => setCurrentScreen('locator')}
+                        className="px-4 py-2 bg-[#1A3A6B] hover:bg-[#12284C] text-white text-[10.5px] font-black rounded-lg flex items-center gap-1 shadow-sm transition-all uppercase"
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-white" />
+                        Open Precinct Locator
+                      </button>
                     </div>
+                  </div>
+                </div>
+              )}
 
-                    {/* Questionnaire list */}
-                    <div className="mb-4">
-                      <p className="font-bold uppercase mb-1 text-[#1A3A6B]">{trans.section5}</p>
-                      <div className="bg-slate-50 p-3 rounded border border-slate-200">
-                        {guidedQuestions.map((q, idx) => (
-                          <div key={idx} className="mb-2 last:mb-0">
-                            <p className="font-bold text-slate-600">Q: {q.q}</p>
-                            <p className="text-slate-800 ml-2">&bull; {answers[q.key] || "N/A"}</p>
+              {/* ----------------------------------------------------
+                    STEP 4: COMPLAINANT / VICTIM DETAILS
+                    ---------------------------------------------------- */}
+              {wizardCategory !== null && wizardStep === 4 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-6">
+                    <User className="w-4 h-4 text-[#1A3A6B]" />
+                    <h3 className="text-xs font-black text-[#1A3A6B] uppercase tracking-wider">
+                      {language === 'en' ? 'Step 4: Complainant / Victim Profile' : 'चरण 4: शिकायतकर्ता / पीड़ित का विवरण'}
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-750 mb-1.5">
+                        {language === 'en' ? 'Full Name:' : 'पूरा नाम:'}
+                      </label>
+                      <input
+                        type="text"
+                        value={wizardForm.complainantName || ''}
+                        onChange={(e) => setWizardForm(prev => ({ ...prev, complainantName: e.target.value }))}
+                        className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-750 mb-1.5">
+                        {language === 'en' ? 'Phone Number:' : 'फोन नंबर:'}
+                      </label>
+                      <input
+                        type="text"
+                        value={wizardForm.complainantPhone || ''}
+                        onChange={(e) => setWizardForm(prev => ({ ...prev, complainantPhone: e.target.value }))}
+                        className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2"
+                      />
+                    </div>
+                    <div className="col-span-1 sm:col-span-2">
+                      <label className="block text-xs font-bold text-slate-750 mb-1.5">
+                        {language === 'en' ? 'Residential Address:' : 'आवासीय पता:'}
+                      </label>
+                      <input
+                        type="text"
+                        value={wizardForm.complainantAddress || ''}
+                        onChange={(e) => setWizardForm(prev => ({ ...prev, complainantAddress: e.target.value }))}
+                        className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ----------------------------------------------------
+                    STEP 5: SUSPECT AND WITNESS INFO
+                    ---------------------------------------------------- */}
+              {wizardCategory !== null && wizardStep === 5 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-6">
+                    <Shield className="w-4 h-4 text-[#1A3A6B]" />
+                    <h3 className="text-xs font-black text-[#1A3A6B] uppercase tracking-wider">
+                      {language === 'en' ? 'Step 5: Suspect and Witness Information' : 'चरण 5: संदिग्ध और गवाह की जानकारी'}
+                    </h3>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-750 mb-1.5">
+                        {language === 'en' ? 'Accused / Suspect Details (if known):' : 'आरोपी / संदिग्ध का विवरण (यदि ज्ञात हो):'}
+                      </label>
+                      <textarea
+                        value={wizardForm.accusedDesc || ''}
+                        onChange={(e) => setWizardForm(prev => ({ ...prev, accusedDesc: e.target.value }))}
+                        rows={3}
+                        placeholder={language === 'en' ? 'Describe physical features, clothing, accent, vehicle or name.' : 'शारीरिक बनावट, पहनावा, लहजा, वाहन या नाम का वर्णन करें।'}
+                        className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2"
+                      ></textarea>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-750 mb-1.5">
+                        {language === 'en' ? 'Witnesses Name and Contact (if any):' : 'गवाहों का नाम और संपर्क (यदि कोई हो):'}
+                      </label>
+                      <input
+                        type="text"
+                        value={wizardForm.witnessName || ''}
+                        onChange={(e) => setWizardForm(prev => ({ ...prev, witnessName: e.target.value }))}
+                        placeholder={language === 'en' ? 'e.g. Ramesh Kumar (+91 9876543210)' : 'उदा. रमेश कुमार (+91 9876543210)'}
+                        className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ----------------------------------------------------
+                    STEP 6: EVIDENCE UPLOAD TIMELINE
+                    ---------------------------------------------------- */}
+              {wizardCategory !== null && wizardStep === 6 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-6">
+                    <Upload className="w-4 h-4 text-[#1A3A6B]" />
+                    <h3 className="text-xs font-black text-[#1A3A6B] uppercase tracking-wider">
+                      {language === 'en' ? 'Step 6: Secure Evidence Locker Upload' : 'चरण 6: साक्ष्य लॉकर में अपलोड करें'}
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-slate-50 border-2 border-dashed border-[#1A3A6B]/30 p-6 rounded-2xl text-center flex flex-col items-center justify-center min-h-[180px]">
+                      {isUploading ? (
+                        <div className="flex flex-col items-center">
+                          <div className="relative w-10 h-10 mb-2 flex items-center justify-center">
+                            <div className="absolute inset-0 rounded-full border-2 border-slate-100"></div>
+                            <div className="absolute inset-0 rounded-full border-2 border-t-[#1A3A6B] animate-spin"></div>
+                            <span className="text-[8px] text-[#1A3A6B] font-bold font-mono">{uploadProgress}%</span>
                           </div>
-                        ))}
-                      </div>
+                          <p className="text-[10px] text-slate-500 font-bold">Encrypting & Storing...</p>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="w-8 h-8 text-[#1A3A6B]/40 mb-2 animate-bounce" />
+                          <h4 className="text-xs font-bold text-slate-700">{language === 'en' ? 'Attach File Proof' : 'साक्ष्य फ़ाइल संलग्न करें'}</h4>
+                          <p className="text-[9px] text-slate-400 mt-0.5 mb-4 max-w-[150px]">{language === 'en' ? 'Supports receipts, chats, call recordings, etc.' : 'रसीद, स्क्रीनशॉट, कॉल रिकॉर्डिंग आदि।'}</p>
+                          
+                          <label className="px-4 py-2 bg-[#1A3A6B] hover:bg-[#12284C] text-white rounded-xl text-[10px] font-black cursor-pointer shadow transition-all uppercase">
+                            {language === 'en' ? 'Upload' : 'अपलोड'}
+                            <input 
+                              type="file" 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                if (file.size > 10 * 1024 * 1024) {
+                                  alert("File size exceeds 10MB limit!");
+                                  return;
+                                }
+                                setIsUploading(true);
+                                setUploadProgress(10);
+                                let p = 10;
+                                const interval = setInterval(() => {
+                                  p += 30;
+                                  if (p >= 100) {
+                                    clearInterval(interval);
+                                    setIsUploading(false);
+                                    setUploadProgress(0);
+                                    const newFile = {
+                                      id: Date.now(),
+                                      name: file.name,
+                                      size: (file.size / 1024).toFixed(1) + " KB",
+                                      category: "Wizard Evidence",
+                                      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                    };
+                                    setEvidenceFiles(prev => [...prev, newFile]);
+                                    alert("Evidence File secured!");
+                                  } else {
+                                    setUploadProgress(p);
+                                  }
+                                }, 300);
+                              }}
+                              className="hidden" 
+                            />
+                          </label>
+                        </>
+                      )}
                     </div>
 
-                    {/* Codification */}
-                    <div className="mb-4">
-                      <p className="font-bold uppercase mb-1 text-[#1A3A6B]">{trans.section6}</p>
-                      <p>&bull; <strong>{trans.bnsCode}</strong> {legalDetails.bns}</p>
-                      <p>&bull; <strong>{trans.ipcCode}</strong> {legalDetails.ipc}</p>
-                      <p className="text-[10px] text-slate-500 mt-1 italic">{trans.note} {legalDetails.desc}</p>
-                    </div>
-
-                    {/* Evidence index */}
-                    <div className="mb-4">
-                      <p className="font-bold uppercase mb-1 text-[#1A3A6B]">{trans.section7}</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {evidenceFiles.map((file, idx) => (
-                          <div key={idx} className="p-2 bg-slate-50 rounded border border-slate-200 text-[10px]">
-                            <p className="font-bold text-slate-700 truncate">{file.name}</p>
-                            <p className="text-slate-400">Size: {file.size} &bull; Type: {file.category}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="border-t-2 border-slate-800 pt-4 flex justify-between items-center text-[10px] mt-6">
+                    <div className="bg-slate-50 p-4 border border-slate-200 rounded-2xl flex flex-col justify-between">
                       <div>
-                        <p className="font-bold text-[#1A3A6B]">Smart FIR Verification Seal</p>
-                        <p className="text-[8px] text-slate-400 italic">State Legal Security Clearance active.</p>
+                        <h4 className="text-[10px] font-black text-slate-655 uppercase tracking-wider mb-3">
+                          Uploaded Evidentiary Files
+                        </h4>
+                        
+                        <div className="flex flex-col gap-2 max-h-[120px] overflow-y-auto custom-scrollbar">
+                          {evidenceFiles.map(file => (
+                            <div key={file.id} className="p-2.5 bg-white border border-slate-200 rounded-xl flex items-center justify-between text-[10.5px]">
+                              <div className="truncate pr-2">
+                                <p className="font-bold text-slate-700 truncate">{file.name}</p>
+                                <p className="text-[8.5px] text-slate-400">Size: {file.size} &bull; Secured</p>
+                              </div>
+                              <span className="text-[8px] text-emerald-700 font-bold uppercase shrink-0">ENCRYPTED</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="text-right border-t border-slate-600 px-4 pt-1 font-bold">
-                        {trans.signatureComplainant}
+                      
+                      <div className="text-[9px] text-[#1A3A6B] font-bold mt-2">
+                        AES-255 Vault Protocol active. All files are encrypted.
                       </div>
                     </div>
                   </div>
-                );
-              })()}
-
-            </div>
-
-            {/* Disclaimer strip */}
-            <div className="mt-4 p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 leading-normal flex gap-3 shadow-sm">
-              <Info className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-              <p>{text.firDisclaimer}</p>
-            </div>
-
-            {/* Action Bar */}
-            <div className="mt-6 flex justify-center gap-3">
-              <button 
-                onClick={() => setCurrentScreen('dashboard')}
-                className="px-5 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-600 text-xs font-bold"
-              >
-                Cancel & return Home
-              </button>
-              <button 
-                onClick={exportFIRDraftPDF}
-                className="cyber-btn-blue px-6 py-2.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow"
-              >
-                <DownloadCloud className="w-4.5 h-4.5" /> Download Complaint PDF
-              </button>
-            </div>
-
-          </div>
-        )}
-
-        {/* 9. PDF GENERATION SUCCESS SCREEN */}
-        {currentScreen === 'pdfsuccess' && (
-          <div className="max-w-md mx-auto text-center">
-            
-            <div className="w-16 h-16 rounded-full bg-emerald-50 border-2 border-emerald-500 flex items-center justify-center mx-auto mb-6 shadow-sm">
-              <CheckCircle2 className="w-9 h-9 text-emerald-600" />
-            </div>
-
-            <h2 className="text-2xl font-black text-slate-800 mb-1">{text.pdfReady}</h2>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto mb-6">
-              Your official citizen legal complaint draft has been compiled successfully and saved. Present this copy to any police precinct.
-            </p>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 text-left shadow-sm mb-6 relative overflow-hidden">
-              <div className="flex items-start gap-4">
-                <div className="w-11 h-11 rounded-lg bg-[#E8EEF5] flex items-center justify-center text-[#1A3A6B]">
-                  <FileText className="w-6 h-6" />
                 </div>
-                <div>
-                  <h4 className="text-xs font-black text-slate-800">Smart_FIR_Draft.pdf</h4>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Bilingual Draft &bull; jsPDF Generated</p>
-                  <p className="text-[9px] text-emerald-600 font-bold mt-1 flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5" /> Fully Synchronized & Saved
+              )}
+
+              {/* ----------------------------------------------------
+                    STEP 7: REVIEW FIR DRAFT & BNS SUGGESTIONS
+                    ---------------------------------------------------- */}
+              {wizardCategory !== null && wizardStep === 7 && (
+                <div className="space-y-6">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Shield className="w-4 h-4 text-[#1A3A6B]" />
+                      <h3 className="text-xs font-black text-[#1A3A6B] uppercase tracking-wider">
+                        {language === 'en' ? 'Step 7: BNS 2023 Suggested Sections & Draft Review' : 'चरण 7: बीएनएस २०२३ शिफारस अनुभाग और पूर्वावलोकन'}
+                      </h3>
+                    </div>
+                    <p className="text-[10.5px] text-slate-500">
+                      Based on AI Incident Categorization, the following legal sections from Bharatiya Nyaya Sanhita (BNS), 2023 / IPC apply:
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* BNS suggestion cards */}
+                    <div className="space-y-3">
+                      <label className="block text-[9.5px] font-black text-slate-400 uppercase">
+                        AI Recommended BNS Legal Sections
+                      </label>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {(() => {
+                          const details = getLegalSections(wizardCategory);
+                          let suggestions = [];
+                          if (wizardCategory === 'Theft' || wizardCategory === 'Mobile theft') {
+                            suggestions = [
+                              { sec: "Section 303 BNS", title: "Standard Theft", desc: "For stealing of movable items (phone, wallet, cash)." },
+                              { sec: "Section 305 BNS", title: "Theft in Dwelling", desc: "Theft inside a residential space or premises." },
+                              { sec: "Section 307 BNS", title: "Snatching", desc: "Forcible snatching directly from hands." }
+                            ];
+                          } else if (wizardCategory === 'Assault') {
+                            suggestions = [
+                              { sec: "Section 115 BNS", title: "Voluntarily Causing Hurt", desc: "Leading to physical injury or physical bruises." },
+                              { sec: "Section 117 BNS", title: "Grievous Hurt", desc: "Severe bodily injuries, fractures or cuts." }
+                            ];
+                          } else if (wizardCategory === 'Harassment') {
+                            suggestions = [
+                              { sec: "Section 78 BNS", title: "Stalking", desc: "Following, cyber monitoring, or repetitive stalking." },
+                              { sec: "Section 79 BNS", title: "Insulting Modesty", desc: "Verbal insults or obscene gestures toward a woman." }
+                            ];
+                          } else if (wizardCategory === 'Cyber crime') {
+                            suggestions = [
+                              { sec: "Section 318 BNS", title: "Cheating by Phishing", desc: "Online money frauds or fraudulent UPI transactions." },
+                              { sec: "Section 319 BNS", title: "Personation Fraud", desc: "Impersonating bank, official, or profiles online." }
+                            ];
+                          } else if (wizardCategory === 'Accident') {
+                            suggestions = [
+                              { sec: "Section 281 BNS", title: "Rash & Negligent Driving", desc: "Operating vehicles in public way rashly endangering life." },
+                              { sec: "Section 106 BNS", title: "Negligent Death (Hit & Run)", desc: "Causing accidental demise with hit-and-run sequence." }
+                            ];
+                          } else {
+                            suggestions = [
+                              { sec: "Section 324 BNS", title: "Mischief", desc: "Malicious property damage or utility dispute." }
+                            ];
+                          }
+
+                          return suggestions.map((s, idx) => (
+                            <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs flex flex-col justify-between animate-fade-in">
+                              <div>
+                                <p className="font-bold text-[#1A3A6B]">{s.sec} - {s.title}</p>
+                                <p className="text-[9px] text-slate-400 mt-0.5 leading-relaxed">{s.desc}</p>
+                              </div>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+
+                      {/* Legal Disclaimer */}
+                      <div className="bg-amber-50 border border-amber-300 p-3 rounded-xl text-[9px] text-amber-800 flex gap-2 font-medium">
+                        <Info className="w-4.5 h-4.5 text-amber-700 shrink-0" />
+                        <p>{language === 'en' ? 'Disclaimer: Recommended sections are system recommendations only. The final legal sections will be finalized by Police Officer upon FIR entry.' : 'अस्वीकरण: हे कायदेशीर कलमे केवळ संगणकीय शिफारस आहे. अंतिम कलमे पोलीस ठाण्यातील चौकशी अधिकारी ठरवतील.'}</p>
+                      </div>
+                    </div>
+
+                    {/* Scrollable Document Preview */}
+                    <div>
+                      <label className="block text-[9.5px] font-black text-slate-400 uppercase mb-2">
+                        {language === 'en' ? 'Formal Complaint Draft Preview' : 'तैयार शिकायत पत्र का पूर्वावलोकन'}
+                      </label>
+                      <div className="bg-slate-50 border-2 border-slate-200 p-5 rounded-2xl font-mono text-[10.5px] leading-relaxed max-h-[220px] overflow-y-auto custom-scrollbar select-text text-slate-800 shadow-inner text-left">
+                        <div className="text-center font-bold text-[#1A3A6B] uppercase mb-4 pb-2 border-b border-slate-300">
+                          {language === 'en' ? 'FORM I - COMPLAINT SUMMARIZATION DOCKET' : 'फॉर्म I - शिकायत सारांश (मार्गदर्शन मसौदा)'}
+                        </div>
+                        <p><strong>District/Precinct:</strong> Sakinaka Police Station, Zone 10, Mumbai City</p>
+                        <p><strong>Incident Category:</strong> {wizardCategory}</p>
+                        <p><strong>Occurrence Date & Time:</strong> {wizardForm.incidentDate?.replace('T', ' ')}</p>
+                        <p><strong>Exact Occurrence Location:</strong> {wizardForm.incidentLocation}</p>
+                        <p className="border-t border-dashed border-slate-300 my-2 pt-2"><strong>Complainant Full Name:</strong> {wizardForm.complainantName}</p>
+                        <p><strong>Phone:</strong> {wizardForm.complainantPhone}</p>
+                        <p><strong>Address:</strong> {wizardForm.complainantAddress}</p>
+                        {wizardForm.stolenItems && <p><strong>Stolen Items:</strong> {wizardForm.stolenItems} (Approx Value: {wizardForm.estimatedValue})</p>}
+                        <p className="border-t border-dashed border-slate-300 my-2 pt-2"><strong>Statement Description:</strong></p>
+                        <p className="bg-white p-3 border border-slate-200 rounded italic text-slate-700 whitespace-pre-wrap leading-relaxed">
+                          {wizardForm.incidentDesc || 'No statement provided.'}
+                        </p>
+                        <p className="border-t border-dashed border-slate-300 my-2 pt-2"><strong>Accused / Suspect Profile:</strong> {wizardForm.accusedDesc || 'Unknown'}</p>
+                        <p><strong>Witness Info:</strong> {wizardForm.witnessName || 'None'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ----------------------------------------------------
+                    STEP 8: SUBMIT / DOWNLOAD PDF
+                    ---------------------------------------------------- */}
+              {wizardCategory !== null && wizardStep === 8 && (
+                <div className="text-center py-6">
+                  <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-emerald-500">
+                    <Check className="w-8 h-8 text-emerald-600" />
+                  </div>
+                  <h3 className="text-lg font-black text-slate-800 font-montserrat uppercase">
+                    {language === 'en' ? 'Draft Generated Successfully!' : 'शिकायत पत्र सफलतापूर्वक तैयार!'}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-2 max-w-md mx-auto leading-relaxed">
+                    {language === 'en' 
+                      ? 'Your formal complaint summarization draft is ready. You can secure it on your profile, copy the raw draft text, or print it as a certified PDF to submit directly at the police precinct.' 
+                      : 'आपला मसुदा यशस्वीरीत्या तयार झाला आहे. तो आपण प्रोफाईलमध्ये जतन करू शकता किंवा पीडीएफ स्वरूपात डाऊनलोड करू शकता.'}
                   </p>
+
+                  <div className="flex flex-col sm:flex-row justify-center items-center gap-3 mt-8 max-w-md mx-auto">
+                    <button
+                      onClick={() => {
+                        const repId = "rep_" + Date.now();
+                        const finalAnswers = {
+                          complainantName: wizardForm.complainantName,
+                          complainantPhone: wizardForm.complainantPhone,
+                          complainantAddress: wizardForm.complainantAddress,
+                          incidentDate: wizardForm.incidentDate,
+                          incidentLocation: wizardForm.incidentLocation,
+                          witnessName: wizardForm.witnessName || 'None',
+                          witnessPhone: 'N/A',
+                          incidentDesc: wizardForm.incidentDesc || 'Citizen statement',
+                          stolenItem: wizardCategory === 'Mobile theft' || wizardCategory === 'Theft' ? (wizardForm.stolenItems || 'General movable item') : '',
+                          itemValue: wizardCategory === 'Mobile theft' || wizardCategory === 'Theft' ? (wizardForm.estimatedValue || '0') : '',
+                          hasCctv: 'Not sure',
+                          suspectDesc: wizardForm.accusedDesc || 'Unknown',
+                          transactionId: wizardForm.transactionId || '',
+                          platformName: wizardForm.platformName || '',
+                          hasScreenshots: 'Yes',
+                          suspectContact: '',
+                          injuriesSustained: wizardForm.abuseDetails || '',
+                          hasMedicalReport: 'No',
+                          weaponUsed: 'No',
+                          relationshipAccused: '',
+                          stalkerDetails: '',
+                          frequency: '',
+                          witnessDetails: '',
+                          specialSupport: '',
+                          abuserRelation: '',
+                          abuseDuration: '',
+                          medicalNeeded: '',
+                          anyChildren: '',
+                          otherDetails: ''
+                        };
+                        setAnswers(finalAnswers);
+                        setClassifiedCategory(wizardCategory);
+
+                        dbService.saveFIRReport(repId, {
+                          userId: currentUser ? currentUser.uid : 'guest',
+                          incidentType: wizardCategory,
+                          incidentDate: wizardForm.incidentDate,
+                          location: wizardForm.incidentLocation,
+                          firDraft: finalAnswers
+                        }).then(() => {
+                          alert(language === 'en' ? 'Complaint secured in Profile drafts.' : 'विवरण सफलतापूर्वक सहेजा गया।');
+                        });
+                      }}
+                      className="w-full sm:flex-1 py-3 px-4 bg-[#10B981] hover:bg-[#059669] text-white text-xs font-black rounded-xl shadow transition-all flex items-center justify-center gap-1.5 uppercase font-bold"
+                    >
+                      <Check className="w-4 h-4 text-white" />
+                      {language === 'en' ? 'Secure to Profile' : 'मसौदा सहेजें'}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        const complainantName = wizardForm.complainantName;
+                        const complainantPhone = wizardForm.complainantPhone;
+                        const complainantAddress = wizardForm.complainantAddress;
+                        const finalAnswers = {
+                          complainantName,
+                          complainantPhone,
+                          complainantAddress,
+                          incidentDate: wizardForm.incidentDate,
+                          incidentLocation: wizardForm.incidentLocation,
+                          witnessName: wizardForm.witnessName || 'None',
+                          witnessPhone: 'N/A',
+                          incidentDesc: wizardForm.incidentDesc || 'Citizen statement',
+                          stolenItem: wizardCategory === 'Mobile theft' || wizardCategory === 'Theft' ? (wizardForm.stolenItems || 'General movable item') : '',
+                          itemValue: wizardCategory === 'Mobile theft' || wizardCategory === 'Theft' ? (wizardForm.estimatedValue || '0') : '',
+                          hasCctv: 'Not sure',
+                          suspectDesc: wizardForm.accusedDesc || 'Unknown',
+                          transactionId: wizardForm.transactionId || '',
+                          platformName: wizardForm.platformName || '',
+                          hasScreenshots: 'Yes',
+                          suspectContact: '',
+                          injuriesSustained: wizardForm.abuseDetails || '',
+                          hasMedicalReport: 'No',
+                          weaponUsed: 'No',
+                          relationshipAccused: '',
+                          stalkerDetails: '',
+                          frequency: '',
+                          witnessDetails: '',
+                          specialSupport: '',
+                          abuserRelation: '',
+                          abuseDuration: '',
+                          medicalNeeded: '',
+                          anyChildren: '',
+                          otherDetails: ''
+                        };
+                        setAnswers(finalAnswers);
+                        setClassifiedCategory(wizardCategory);
+                        
+                        setTimeout(() => {
+                          exportFIRDraftPDF();
+                        }, 200);
+                      }}
+                      className="w-full sm:flex-1 py-3 px-4 bg-[#1A3A6B] hover:bg-[#12284C] text-white text-xs font-black rounded-xl shadow transition-all flex items-center justify-center gap-1.5 uppercase font-bold"
+                    >
+                      <Download className="w-4 h-4 text-white" />
+                      {language === 'en' ? 'Download PDF' : 'पीडीएफ डाउनलोड'}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* ----------------------------------------------------
+                    NAVIGATION BUTTONS FOOTER
+                    ---------------------------------------------------- */}
+              {wizardCategory !== null && (
+                <div className="flex justify-between items-center pt-6 mt-6 border-t border-slate-100">
+                  <button
+                    onClick={() => {
+                      if (wizardStep > 2) {
+                        setWizardStep(prev => prev - 1);
+                      } else {
+                        setWizardCategory(null);
+                      }
+                    }}
+                    className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-350 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1 transition-all font-sans"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    {language === 'en' ? 'Previous' : 'पिछला'}
+                  </button>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        if (isPlayingSiren) triggerAudioSiren();
+                        setCurrentScreen('dashboard');
+                      }}
+                      className="px-4 py-2.5 text-slate-500 hover:text-slate-700 text-xs font-bold transition-all font-sans"
+                    >
+                      {language === 'en' ? 'Exit Setup' : 'बाहर निकलें'}
+                    </button>
+
+                    {wizardStep < 8 ? (
+                      <button
+                        onClick={() => {
+                          if (wizardStep === 2 && !wizardForm.incidentDesc?.trim()) {
+                            alert(language === 'en' ? 'Please provide a simple incident description.' : 'कृपया घटना का संक्षिप्त विवरण अवश्य दर्ज करें।');
+                            return;
+                          }
+                          if (wizardStep === 3 && !wizardForm.incidentLocation?.trim()) {
+                            alert(language === 'en' ? 'Please specify occurrence location.' : 'कृपया घटना का स्थान निर्दिष्ट करें।');
+                            return;
+                          }
+                          if (wizardStep === 4 && (!wizardForm.complainantName?.trim() || !wizardForm.complainantPhone?.trim())) {
+                            alert(language === 'en' ? 'Please provide Complainant Name and Phone.' : 'कृपया शिकायतकर्ता का नाम और फोन नंबर दर्ज करें।');
+                            return;
+                          }
+                          setWizardStep(prev => prev + 1);
+                        }}
+                        className="px-6 py-2.5 bg-[#1A3A6B] hover:bg-[#12284C] text-white text-xs font-bold rounded-xl flex items-center gap-1 shadow transition-all font-sans font-bold"
+                      >
+                        {language === 'en' ? 'Next Step' : 'अगला चरण'}
+                        <ChevronRight className="w-3.5 h-3.5 text-white" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setCurrentScreen('dashboard')}
+                        className="px-6 py-2.5 bg-[#1A3A6B] hover:bg-[#12284C] text-white text-xs font-bold rounded-xl flex items-center gap-1 shadow transition-all font-sans font-bold"
+                      >
+                        {language === 'en' ? 'Finish Wizard' : 'तैयारी समाप्त करें'}
+                        <Check className="w-3.5 h-3.5 text-white" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
             </div>
-
-            <div className="flex flex-col gap-2">
-              <button 
-                onClick={exportFIRDraftPDF}
-                className="w-full cyber-btn-blue py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow"
-              >
-                <Download className="w-4 h-4" /> Download Copy Again
-              </button>
-              <div className="grid grid-cols-2 gap-2">
-                <button 
-                  onClick={() => window.print()}
-                  className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold flex items-center justify-center gap-1 shadow-sm"
-                >
-                  <Printer className="w-3.5 h-3.5" /> Print FIR
-                </button>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText(`Smart FIR Draft:\nCategory: ${classifiedCategory}\nPrimary Sections: ${getLegalSections(classifiedCategory).bns}\nVerified on Portal.`);
-                    alert("Draft summary copied to clipboard!");
-                  }}
-                  className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold flex items-center justify-center gap-1 shadow-sm"
-                >
-                  <Share2 className="w-3.5 h-3.5" /> Copy Text
-                </button>
-              </div>
-            </div>
-
-            <button 
-              onClick={() => setCurrentScreen('dashboard')}
-              className="mt-8 text-xs text-slate-500 hover:text-[#1A3A6B] flex items-center justify-center gap-1.5 mx-auto transition-all"
-            >
-              <ArrowLeft className="w-4 h-4" /> Return to Portal Home
-            </button>
-
           </div>
         )}
 
@@ -2506,30 +3247,84 @@ function App() {
         {currentScreen === 'locator' && (
           <div className="max-w-5xl mx-auto">
             
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
               <div>
                 <h2 className="text-xl font-black text-slate-800">{text.locatorTitle}</h2>
                 <p className="text-xs text-slate-500 mt-1">{text.locatorSub}</p>
               </div>
-              <span className="text-[9px] text-[#1A3A6B] font-bold px-3 py-1 rounded bg-[#E8EEF5] border border-[#1A3A6B]/20">
-                ZONE 10 JURISDICTION
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-[9px] text-[#1A3A6B] font-bold px-3 py-1.5 rounded bg-[#E8EEF5] border border-[#1A3A6B]/20">
+                  ZONE 10 JURISDICTION
+                </span>
+                {!isLiveTracking ? (
+                  <button onClick={startLiveTracking} className="px-4 py-1.5 bg-[#1A3A6B] hover:bg-[#12284C] text-white text-xs font-bold rounded-lg shadow flex items-center gap-1.5 transition-colors">
+                    <Icon name="mapPin" className="w-3.5 h-3.5" /> Start Live Location Tracking
+                  </button>
+                ) : (
+                  <button onClick={stopLiveTracking} className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg shadow flex items-center gap-1.5 transition-colors animate-pulse">
+                    <Icon name="x" className="w-3.5 h-3.5" /> Stop Live Location Tracking
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Live Tracking Status Dashboard */}
+            {isLiveTracking && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-6 shadow-sm">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center animate-pulse">
+                      <Icon name="mapPin" className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-blue-900">Live Tracking Active</h4>
+                      <p className="text-[10px] text-blue-700 mt-0.5">
+                        {liveCoords ? `Lat: ${liveCoords.lat.toFixed(5)}, Lng: ${liveCoords.lng.toFixed(5)}` : 'Locating satellite...'}
+                      </p>
+                      <p className="text-[10px] text-blue-700 mt-0.5 font-bold" id="accuracyText">
+                        {liveCoords ? `Accuracy: ${Math.round(accuracyMeters)} meters` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {liveCoords && (
+                    <div className="text-left md:text-right flex flex-col items-start md:items-end gap-2">
+                      <div>
+                        <p className="text-[10px] font-bold text-blue-900">Nearest Station: {sortedStations[0]?.name}</p>
+                        <p className="text-[9px] text-blue-600 mt-0.5">Last updated: {lastUpdatedTime}</p>
+                      </div>
+                      <button onClick={refreshLocation} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded shadow transition-colors flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-10.05l5.67-5.67"/></svg> Refresh Location
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {accuracyWarning && (
+                  <div className="mt-3 bg-amber-100 border border-amber-300 text-amber-800 text-[10px] font-bold p-2 rounded flex items-center gap-2">
+                    <Icon name="alertTriangle" className="w-4 h-4" /> {accuracyWarning}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {trackingError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-bold p-3 rounded-xl mb-6 flex items-center gap-2">
+                <Icon name="alertTriangle" className="w-4 h-4" /> {trackingError}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               
               {/* Map Canvas */}
               <div className="col-span-12 lg:col-span-7 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative min-h-[350px]">
-                <iframe
-                  title="Sakinaka Region Divisional Map Locator"
-                  width="100%"
-                  height="300"
-                  frameBorder="0" 
-                  style={{ border: 0, borderRadius: '12px' }}
-                  src={`https://www.google.com/maps/embed/v1/place?key=${googleMapsKey || 'AIzaSyDummyKeyForStaticFallback'}&q=Sakinaka+Police+Station,Mumbai+Zone10+Maharashtra&zoom=14`}
-                  allowFullScreen
-                  className="w-full h-full"
-                />
+                <div
+                  ref={mapContainerRef}
+                  title="Precinct Full Map"
+                  style={{ height: '300px', width: '100%', borderRadius: '12px' }}
+                  className="w-full h-full bg-slate-100 flex items-center justify-center"
+                >
+                  <p className="text-xs text-slate-500 font-bold">Loading Google Maps...</p>
+                </div>
               </div>
 
               {/* Station Listing */}
@@ -2539,7 +3334,12 @@ function App() {
                 </h3>
 
                 <div className="flex flex-col gap-3 max-h-[350px] overflow-y-auto custom-scrollbar">
-                  {POLICE_STATIONS.map((ps) => (
+                  {isSearchingPlaces && (
+                    <div className="p-4 text-center text-xs text-slate-500 font-bold bg-slate-50 rounded-xl animate-pulse">
+                      Scanning area for active police stations...
+                    </div>
+                  )}
+                  {!isSearchingPlaces && sortedStations.map((ps) => (
                     <div 
                       key={ps.id} 
                       className={`p-4 rounded-xl bg-white border border-slate-200 text-xs flex items-center justify-between gap-4 transition-all hover:border-[#1A3A6B]/30 ${
@@ -2573,7 +3373,7 @@ function App() {
                           <Phone className="w-3.5 h-3.5" />
                         </button>
                         <a 
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${ps.lat},${ps.lng}`}
+                          href={isLiveTracking && liveCoords ? `https://www.google.com/maps/dir/?api=1&origin=${liveCoords.lat},${liveCoords.lng}&destination=${ps.lat},${ps.lng}` : `https://www.google.com/maps/dir/?api=1&destination=${ps.lat},${ps.lng}`}
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 hover:text-[#1A3A6B] hover:bg-slate-100"
